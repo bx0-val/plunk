@@ -8,7 +8,8 @@
     "dev": "vite --host 127.0.0.1",
     "build": "node scripts/build-guide.mjs && tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "assets": "node scripts/assets.mjs"
+    "assets": "node scripts/assets.mjs",
+    "test:ui": "playwright test"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
@@ -16,6 +17,7 @@
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.0",

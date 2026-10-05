@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="410" viewBox="0 0 1200 410" role="img" aria-labelledby="title desc">
+  <title id="title">Plunk. Your camera. Your folders.</title><desc id="desc">Pic → Name → Location. Straight to your server.</desc>
+  <defs><radialGradient id="glow"><stop stop-color="#ff8050" stop-opacity=".17"/><stop offset="1" stop-color="#ff8050" stop-opacity="0"/></radialGradient></defs>
+  <rect width="1200" height="410" rx="28" fill="#0e1014"/><ellipse cx="990" cy="170" rx="350" ry="320" fill="url(#glow)"/>
+  <g font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif">
+    <text x="64" y="107" fill="#f4f4f5" font-size="72" font-weight="900" letter-spacing="-5">plunk<tspan fill="#ff8050">.</tspan></text>
+    <text x="66" y="184" fill="#f4f4f5" font-size="36" font-weight="650" letter-spacing="-1">Your camera. Your folders.</text>
+    <text x="68" y="227" fill="#a2a8b4" font-size="21">A little less sending things to yourself.</text>
+    <rect x="64" y="285" width="417" height="55" rx="14" fill="#1b2028" stroke="#353b46"/>
+    <text x="89" y="320" fill="#ff946c" font-size="22" font-weight="600">Pic <tspan fill="#798291">→</tspan> Name <tspan fill="#798291">→</tspan> Location</text>
+  </g>
+  <g transform="translate(850 68)">
+    <rect x="33" y="0" width="118" height="134" rx="20" fill="#faf7f0" transform="rotate(9 92 67)"/>
+    <rect x="48" y="15" width="88" height="91" rx="10" fill="#263732" transform="rotate(9 92 67)"/>
+    <path d="m55 82 27-29 18 21 15-10 20 33" fill="none" stroke="#b5d9c4" stroke-width="5"/>
+    <circle cx="113" cy="42" r="8" fill="#ff8050"/>
+    <path d="M7 155a16 16 0 0 1 16-16h57l22 23h89a16 16 0 0 1 16 16v108H7Z" fill="#c4542c"/>
+    <rect x="0" y="176" width="220" height="120" rx="20" fill="#ff8050"/>
+    <path d="m89 231 16 16 30-32" fill="none" stroke="#301a11" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { flushSync } from "react-dom";
 import {
   ArrowLeft,
   ArrowRight,
@@ -46,11 +47,13 @@ function ServerSettings({
   onSave,
   onClose,
   pairCode = "",
+  onPaired,
 }: {
   servers: Server[];
   onSave: (value: Server[]) => void;
   onClose: () => void;
   pairCode?: string;
+  onPaired: () => void;
 }) {
   const [draft, setDraft] = useState<Server>(emptyServer);
   const [detected, setDetected] = useState(false);
@@ -60,13 +63,16 @@ function ServerSettings({
   const [code, setCode] = useState(pairCode);
   const [pairError, setPairError] = useState("");
   const [pairNotice, setPairNotice] = useState("");
+  const [mode, setMode] = useState<"pair" | "address">("pair");
   const autoPaired = useRef(false);
   const standalone = isStandalone();
   async function pairHere(event?: FormEvent) {
     event?.preventDefault();
     const digits = code.replace(/\D/g, "");
     if (digits.length !== 6) {
-      setPairError("Enter the 6-digit code that plunk pair shows on the server.");
+      setPairError(
+        "Enter the 6-digit code that plunk pair shows on the server.",
+      );
       return;
     }
     setBusy(true);
@@ -86,10 +92,11 @@ function ServerSettings({
         username: "",
         password: "",
       };
-      await request(server, "directories");
+      // Save the credential immediately: the code has already been consumed.
       onSave([...servers.filter((s) => s.id !== server.id), server]);
+      onPaired();
       setCode("");
-      setPairNotice(`${server.name} is connected and saved. Close this to start plunking.`);
+      setPairNotice(`${server.name} is ready for your pictures.`);
     } catch (e) {
       setPairError((e as Error).message);
     } finally {
@@ -170,7 +177,10 @@ function ServerSettings({
           <X />
         </button>
       </div>
-      <h1 id="settings-title">Your servers.</h1>
+      <h1 id="settings-title">
+        {servers.length ? "Your servers" : "Connect a server"}
+        <span className="orange">.</span>
+      </h1>
       <p className="muted">A few details now. Just a tap next time.</p>
       <div className="saved-servers">
         {servers.map((s) => (
@@ -185,6 +195,7 @@ function ServerSettings({
               className="text-button"
               onClick={() => {
                 setDraft(s);
+                setMode("address");
                 setDetected(true);
                 setError("");
                 setNotice("");
@@ -209,157 +220,206 @@ function ServerSettings({
           </div>
         ))}
       </div>
-      <form className="pair-form" onSubmit={pairHere}>
-        <fieldset disabled={busy}>
-          <legend>Pair with a code</legend>
-          {pairCode && !standalone && (
-            <p className="notice">
-              For the best experience, add Plunk to your Home Screen first
-              (Share → Add to Home Screen), open it from the icon, and enter
-              this code there. Or pair this browser now.
-            </p>
-          )}
-          <label>
-            Run <code>plunk pair</code> on the server and enter its code
-            <input
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              placeholder="123 456"
-              maxLength={7}
-              value={code}
-              onChange={(e) => {
-                setCode(e.target.value);
-                setPairError("");
-              }}
-            />
-          </label>
-          {pairError && (
-            <p className="error" role="alert">
-              {pairError}
-            </p>
-          )}
-          {pairNotice && (
-            <p className="notice" role="status">
-              {pairNotice}
-            </p>
-          )}
-          <button className="button primary wide" type="submit">
-            {busy ? "Pairing…" : `Pair with ${window.location.host}`}
-            <ArrowRight size={18} />
-          </button>
-        </fieldset>
-      </form>
-      <form onSubmit={submit}>
-        <fieldset disabled={busy}>
-          <legend>
-            {servers.some((s) => s.id === draft.id)
-              ? "Edit server"
-              : "Or add a server by address"}
-          </legend>
-          <label>
-            Server name <span className="optional">optional</span>
-            <input
-              value={draft.name}
-              onChange={(e) => update({ name: e.target.value })}
-              placeholder="Home lab"
-              autoComplete="off"
-              maxLength={80}
-            />
-          </label>
-          <label>
-            HTTPS address
-            <input
-              type="url"
-              required
-              value={draft.url}
-              onChange={(e) => {
-                update({
-                  url: e.target.value,
-                  token: "",
-                  username: "",
-                  password: "",
-                });
-                setDetected(false);
-              }}
-              placeholder="https://photos.example.com"
-              autoCapitalize="none"
-              autoCorrect="off"
-            />
-          </label>
-          {detected && (
-            <div className="auth-note">
-              Authentication:{" "}
-              <strong>
-                {draft.auth === "none"
-                  ? "None"
-                  : draft.auth === "bearer"
-                    ? "Secret token"
-                    : "Username & password"}
-              </strong>
-            </div>
-          )}
-          {detected && draft.auth === "bearer" && (
-            <label>
-              Secret token
-              <input
-                type="password"
-                required
-                value={draft.token}
-                onChange={(e) => update({ token: e.target.value })}
-                autoComplete="off"
-              />
-            </label>
-          )}
-          {detected && draft.auth === "basic" && (
-            <>
+      <div
+        className="connection-tabs"
+        role="group"
+        aria-label="Connection method"
+      >
+        <button
+          type="button"
+          aria-pressed={mode === "pair"}
+          disabled={busy}
+          onClick={() => setMode("pair")}
+        >
+          Pair with a code
+        </button>
+        <button
+          type="button"
+          aria-pressed={mode === "address"}
+          disabled={busy}
+          onClick={() => setMode("address")}
+        >
+          Use an address
+        </button>
+      </div>
+      {mode === "pair" &&
+        (pairNotice ? (
+          <div className="paired-card" role="status">
+            <span className="paired-check">
+              <Check size={28} />
+            </span>
+            <h2>You’re connected.</h2>
+            <p className="muted">{pairNotice}</p>
+            <button className="button primary wide" onClick={onClose}>
+              Let’s Plunk <ArrowRight size={18} />
+            </button>
+          </div>
+        ) : (
+          <form className="pair-form" onSubmit={pairHere}>
+            <fieldset disabled={busy}>
+              <legend>Six digits. You’re in.</legend>
+              <p className="pair-host">
+                <ServerIcon size={16} />
+                {window.location.host}
+              </p>
+              {pairCode && !standalone && (
+                <p className="notice">
+                  For the best experience, add Plunk to your Home Screen first
+                  (Share → Add to Home Screen), open it from the icon, and enter
+                  this code there. Or pair this browser now.
+                </p>
+              )}
               <label>
-                Username
+                Run <code>plunk pair</code> on the server and enter its code
                 <input
-                  required
-                  value={draft.username}
-                  onChange={(e) => update({ username: e.target.value })}
-                  autoCapitalize="none"
-                  autoComplete="username"
+                  className="pair-code"
+                  aria-label="Pairing code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="123 456"
+                  maxLength={7}
+                  value={code}
+                  onChange={(e) => {
+                    setCode(e.target.value);
+                    setPairError("");
+                  }}
                 />
               </label>
+              {pairError && (
+                <p className="error" role="alert">
+                  {pairError}
+                </p>
+              )}
+              {pairNotice && (
+                <p className="notice" role="status">
+                  {pairNotice}
+                </p>
+              )}
+              <button className="button primary wide" type="submit">
+                {busy ? "Connecting…" : "Connect this server"}
+                <ArrowRight size={18} />
+              </button>
+            </fieldset>
+          </form>
+        ))}
+      {mode === "address" && (
+        <form onSubmit={submit}>
+          <fieldset disabled={busy}>
+            <legend>
+              {servers.some((s) => s.id === draft.id)
+                ? "Edit server"
+                : "Add a server"}
+            </legend>
+            <label>
+              Server name <span className="optional">optional</span>
+              <input
+                value={draft.name}
+                onChange={(e) => update({ name: e.target.value })}
+                placeholder="Home lab"
+                autoComplete="off"
+                maxLength={80}
+              />
+            </label>
+            <label>
+              HTTPS address
+              <input
+                type="url"
+                required
+                value={draft.url}
+                onChange={(e) => {
+                  update({
+                    url: e.target.value,
+                    token: "",
+                    username: "",
+                    password: "",
+                  });
+                  setDetected(false);
+                }}
+                placeholder="https://photos.example.com"
+                autoCapitalize="none"
+                autoCorrect="off"
+              />
+            </label>
+            {detected && (
+              <div className="auth-note">
+                Authentication:{" "}
+                <strong>
+                  {draft.auth === "none"
+                    ? "None"
+                    : draft.auth === "bearer"
+                      ? "Secret token"
+                      : "Username & password"}
+                </strong>
+              </div>
+            )}
+            {detected && draft.auth === "bearer" && (
               <label>
-                Password
+                Secret token
                 <input
                   type="password"
                   required
-                  value={draft.password}
-                  onChange={(e) => update({ password: e.target.value })}
-                  autoComplete="current-password"
+                  value={draft.token}
+                  onChange={(e) => update({ token: e.target.value })}
+                  autoComplete="off"
                 />
               </label>
-            </>
-          )}
-          <p className="fine-print">
-            Credentials stay in this browser’s storage. Anyone using this
-            browser profile can access them. Removing a server clears its saved
-            credentials.
-          </p>
-          {error && (
-            <p className="error" role="alert">
-              {error}
+            )}
+            {detected && draft.auth === "basic" && (
+              <>
+                <label>
+                  Username
+                  <input
+                    required
+                    value={draft.username}
+                    onChange={(e) => update({ username: e.target.value })}
+                    autoCapitalize="none"
+                    autoComplete="username"
+                  />
+                </label>
+                <label>
+                  Password
+                  <input
+                    type="password"
+                    required
+                    value={draft.password}
+                    onChange={(e) => update({ password: e.target.value })}
+                    autoComplete="current-password"
+                  />
+                </label>
+              </>
+            )}
+            <p className="fine-print">
+              Credentials stay in this browser’s storage. Anyone using this
+              browser profile can access them. Removing a server clears its
+              saved credentials.
             </p>
-          )}
-          {notice && (
-            <p className="notice" role="status">
-              {notice}
-            </p>
-          )}
-          <button className="button primary wide" type="submit">
-            {busy
-              ? "Checking connection…"
-              : detected
-                ? "Test & save server"
-                : "Connect to server"}
-            <ArrowRight size={18} />
-          </button>
-        </fieldset>
-      </form>
-      <a className="setup-help" href="/#setup" target="_blank" rel="noreferrer">
+            {error && (
+              <p className="error" role="alert">
+                {error}
+              </p>
+            )}
+            {notice && (
+              <p className="notice" role="status">
+                {notice}
+              </p>
+            )}
+            <button className="button primary wide" type="submit">
+              {busy
+                ? "Checking connection…"
+                : detected
+                  ? "Test & save server"
+                  : "Connect to server"}
+              <ArrowRight size={18} />
+            </button>
+          </fieldset>
+        </form>
+      )}
+      <a
+        className="setup-help"
+        href="/setup.html"
+        target="_blank"
+        rel="noreferrer"
+      >
         Need a listener? Setup instructions ↗
       </a>
     </section>
@@ -368,7 +428,7 @@ function ServerSettings({
 
 export function PhoneApp() {
   const [servers, setServers] = useState(loadServers);
-  const [pairCode] = useState(readPairCode);
+  const [pairCode, setPairCode] = useState(readPairCode);
   const [settings, setSettings] = useState(() => Boolean(pairCode));
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [file, setFile] = useState<File | null>(null);
@@ -390,6 +450,7 @@ export function PhoneApp() {
   const requestRef = useRef<{ key: string; id: string } | null>(null);
   const browseVersion = useRef(0);
   const heading = useRef<HTMLHeadingElement>(null);
+  const nameInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!file) {
       setPreview("");
@@ -401,7 +462,10 @@ export function PhoneApp() {
     return () => URL.revokeObjectURL(url);
   }, [file]);
   useEffect(() => {
-    heading.current?.focus();
+    if (step === 2 && !receipt) {
+      if (document.activeElement !== nameInput.current)
+        nameInput.current?.focus();
+    } else heading.current?.focus();
   }, [step, receipt]);
   useEffect(() => {
     // Keep the one-time code out of history and any Home Screen bookmark.
@@ -418,6 +482,17 @@ export function PhoneApp() {
   function persist(value: Server[]) {
     saveServers(value);
     setServers(value);
+  }
+  function openName() {
+    // iOS only opens its keyboard while focus is inside the original tap gesture.
+    flushSync(() => setStep(2));
+    // Let Safari scroll the field into view as its keyboard opens.
+    nameInput.current?.focus();
+  }
+  function openLocation() {
+    setStep(3);
+    if (servers.length === 1 && selected?.id !== servers[0].id)
+      void browse(servers[0], servers[0].last || null);
   }
   function chooseFile(value?: File) {
     if (!value) return;
@@ -554,6 +629,7 @@ export function PhoneApp() {
           <ServerSettings
             servers={servers}
             pairCode={pairCode}
+            onPaired={() => setPairCode("")}
             onSave={persist}
             onClose={() => {
               setSettings(false);
@@ -561,6 +637,8 @@ export function PhoneApp() {
               setLocation(null);
               browseVersion.current++;
               setBusy(false);
+              if (step === 3 && servers.length === 1)
+                void browse(servers[0], servers[0].last || null);
             }}
           />
         ) : receipt ? (
@@ -619,7 +697,8 @@ export function PhoneApp() {
                 className="back"
                 disabled={uploading || busy}
                 onClick={() => {
-                  setStep(step === 3 ? 2 : 1);
+                  if (step === 3) openName();
+                  else setStep(1);
                   setError("");
                 }}
               >
@@ -663,10 +742,7 @@ export function PhoneApp() {
                 {file ? (
                   <>
                     <div className="photo-preview">{picture}</div>
-                    <button
-                      className="button primary wide"
-                      onClick={() => setStep(2)}
-                    >
+                    <button className="button primary wide" onClick={openName}>
                       Name it <ArrowRight size={20} />
                     </button>
                     <div className="two-actions">
@@ -711,6 +787,14 @@ export function PhoneApp() {
                   <span className="status-dot" /> Your picture goes straight to
                   your server.
                 </p>
+                {servers.length === 0 && (
+                  <button
+                    className="connect-first text-button"
+                    onClick={() => setSettings(true)}
+                  >
+                    Connect a server <ArrowRight size={15} />
+                  </button>
+                )}
               </section>
             )}
             {step === 2 && (
@@ -728,7 +812,7 @@ export function PhoneApp() {
                     setError(issue || "");
                     if (!issue) {
                       setConflict(false);
-                      setStep(3);
+                      openLocation();
                     }
                   }}
                 >
@@ -736,6 +820,9 @@ export function PhoneApp() {
                     Picture name
                     <div className="filename-field">
                       <input
+                        ref={nameInput}
+                        enterKeyHint="next"
+                        autoCorrect="off"
                         required
                         value={name}
                         onChange={(e) => {
@@ -785,7 +872,11 @@ export function PhoneApp() {
                   <span className="orange">.</span>
                 </h1>
                 <div className="file-chip">
-                  <ImagePlus size={18} />
+                  {preview && !previewFailed ? (
+                    <img src={preview} alt="" />
+                  ) : (
+                    <ImagePlus size={18} />
+                  )}
                   <span>{jpegName(name)}</span>
                 </div>
                 {!selected ? (
@@ -831,12 +922,15 @@ export function PhoneApp() {
                         disabled={uploading || busy}
                         className="text-button"
                         onClick={() => {
-                          setSelected(null);
-                          setLocation(null);
-                          setError("");
+                          if (servers.length === 1) setSettings(true);
+                          else {
+                            setSelected(null);
+                            setLocation(null);
+                            setError("");
+                          }
                         }}
                       >
-                        Change
+                        {servers.length === 1 ? "Manage" : "Change"}
                       </button>
                     </div>
                     <div className="breadcrumb">
@@ -872,11 +966,15 @@ export function PhoneApp() {
                       </button>
                     )}
                     {busy ? (
-                      <p className="muted" role="status">
-                        Opening folder…
-                      </p>
+                      <div className="folder-loading" role="status">
+                        <span className="loading-dot" /> Opening folders…
+                      </div>
                     ) : (
-                      <div className="location-list">
+                      <div
+                        className="location-grid"
+                        role="group"
+                        aria-label="Folders"
+                      >
                         {location
                           ? folders.map((folder) => (
                               <button
@@ -895,7 +993,9 @@ export function PhoneApp() {
                                   <Folder size={21} />
                                 </span>
                                 <strong>{folder}</strong>
-                                <ChevronRight size={20} />
+                                <small>
+                                  Open folder <ArrowRight size={14} />
+                                </small>
                               </button>
                             ))
                           : roots.map((root) => (
@@ -914,7 +1014,9 @@ export function PhoneApp() {
                                   <Folder size={21} />
                                 </span>
                                 <strong>{root.name}</strong>
-                                <ChevronRight size={20} />
+                                <small>
+                                  Destination <ArrowRight size={14} />
+                                </small>
                               </button>
                             ))}
                         {location && folders.length === 0 && (

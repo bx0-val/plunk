@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0e1014"><title>Verification — October 5, 2026 · Plunk</title><link rel="icon" href="/brand/icon.svg"><link rel="stylesheet" href="/setup.css"></head>
+<body><nav><a class="logo" href="/">plunk<span>.</span></a><a href="/app">Open the app ↗</a></nav><main><h1>Verification — October 5, 2026</h1>
+<h2>Experience polish</h2>
+<ul>
+<li><code>pnpm build</code> passes the TypeScript check, hosted-guide generation, and optimized Vite build.</li>
+<li><strong>53 Linux tests</strong> pass on Ubuntu/WSL. Existing listener coverage includes none/bearer/Basic auth, invalid credentials, CORS, JPEG/PNG/HEIF, orientation, EXIF removal, dimensions, permissions, filename validation, traversal/symlink boundaries, duplicate names, persistent/concurrent retries, interrupted publication and multipart bodies, size limits, disk-full errors, and denied writes. New CLI tests cover pairing state, interrupted code replacement, display-name ambiguity, destination renaming, port/address changes, color settings, control-character filtering, and plain/copyable URLs.</li>
+<li><strong>7 Chromium tests</strong> at phone size cover synchronous filename focus, the two-column folder grid, skipping a single server, multiple-server choice, remembered folders, first-server setup with the current picture retained, lost-response retry IDs, one-time pairing across settings remounts, explicit browser pairing, 320px layout, dark default, and reduced motion. Listener responses in this suite are stubbed; it is not a physical iOS test.</li>
+<li>Separately, the real production app redeemed a code from a <strong>bearer-authenticated Linux listener</strong>, saved the server, selected the whiteboard fixture, named it <code>the-plan</code>, navigated Projects / Whiteboards, and received a save receipt. The actual file is <code>.local/experience-demo/projects/Whiteboards/the-plan.jpg</code>: 1200 × 900, RGB JPEG, no EXIF.</li>
+<li>A second real flow reused the remembered folder. An existing name returned to the naming screen with the picture retained; choosing the suggested <code>the-plan-2.jpg</code> then saved successfully.</li>
+<li>Refreshed app screenshots and the <strong>18.45-second, 390 × 844, 20 fps H.264 recording</strong> show real UI and Linux responses. The input is a generated whiteboard fixture, not an iPhone camera photograph. The social card includes the actual receipt screenshot.</li>
+<li>Visual checks covered 390px phone and 1440px desktop layouts; automated overflow checks cover 320px. The photo preview fits the whole picture without cropping. Terminal pairing was exercised in a real TTY with the installed QR dependency; permanent tokens are not printed.</li>
+<li>Automated axe checks reported zero violations on the capture, naming, error, success, pairing, landing, and setup screens. Dark gradients and rotated illustration text leave contrast items for manual review. Main palette pairs were checked separately; this is not a complete assistive-technology audit.</li>
+<li>All 58 local documentation/hosted-guide references checked resolve. Guides are generated from Markdown; the native Tailscale path is primary, with Docker and API reference separated.</li>
+</ul>
+<h2>Continuous verification</h2>
+<p>GitHub Actions builds the frontend, runs browser and Linux tests, builds both Docker images, then performs actual authenticated JPEG uploads, safe retry checks, and a 25 MiB request through the Tailscale container proxy. See <a href="https://github.com/bx0-val/plunk/actions/workflows/ci.yml">the workflow runs</a> for the status of a particular commit.</p>
+<p>The <a href="https://github.com/bx0-val/plunk/actions/runs/37269583880">initial successful container run</a> established the Docker path before this visual pass. It does not verify a live Tailscale connection or an iPhone. Local Docker Desktop is not running, so container checks run in CI.</p>
+<h2>Still needs a real device or deployment</h2>
+<ul>
+<li>iPhone camera and HEIC samples, Safari and Home Screen installation/storage, native keyboard appearance after <strong>Name it</strong>, and foreground/background transitions. Synchronous focus is tested in Chromium; only an iPhone can confirm its keyboard behavior.</li>
+<li>The actual Tailscale tailnet, HTTPS certificate issuance, remote connectivity, and systemd installation on the target host. No user&#39;s server was changed during this pass.</li>
+<li>A distinguishable public identity and name/trademark clearance; see the <a href="launch-kit.html">launch kit</a>. No domain was purchased and no public release was made.</li>
+</ul>
+<h2>Reproduce</h2>
+<p>Follow <a href="development.html">development</a>. Run <code>pnpm build</code>, <code>pnpm test:ui</code>, and <code>.venv/bin/python -m pytest server scripts -q</code>. Start the local frontend and Linux test listener for a real upload; <code>pnpm assets</code> generates the labeled fixture.</p>
+<p>The Python test dependency emits a Starlette deprecation warning about its httpx TestClient adapter. Tests pass; this is a dependency maintenance item, not a verified production failure.</p>
+</main></body></html>
