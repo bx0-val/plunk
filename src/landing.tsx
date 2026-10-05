@@ -328,8 +328,9 @@ export function Landing() {
                   <Server size={20} /> Start your listener.
                 </h3>
                 <p>
-                  Run Plunk on Linux. Choose which folders it can see and write
-                  to.
+                  Run <code>plunk install</code> on your Tailscale-connected
+                  Linux server. Then <code>plunk here</code> in a project
+                  folder.
                 </p>
               </div>
             </li>
@@ -340,8 +341,8 @@ export function Landing() {
                   <ShieldCheck size={20} /> Connect your phone.
                 </h3>
                 <p>
-                  Save the HTTPS address and any required token or password.
-                  Local or remote, same flow.
+                  Scan the QR, add Plunk to your Home Screen, and enter the
+                  one-time code. Add other servers by their HTTPS address.
                 </p>
               </div>
             </li>
@@ -352,8 +353,8 @@ export function Landing() {
                   <Camera size={20} /> Make yourself at home.
                 </h3>
                 <p>
-                  Open Plunk in Safari and add it to your Home Screen. Your next
-                  picture has somewhere to go.
+                  Take a pic, name it, tap a folder. Plunk remembers your last
+                  destination. Your next picture has somewhere to go.
                 </p>
               </div>
             </li>

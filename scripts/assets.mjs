@@ -18,7 +18,7 @@ const fixture = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="90
 await sharp(Buffer.from(fixture))
   .jpeg({ quality: 95 })
   .toFile(".local/whiteboard.jpg");
-const social = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630"><rect width="1200" height="630" fill="#faf7f0"/><circle cx="1100" cy="80" r="470" fill="#f56532"/><g fill="#20201e" font-family="Arial,sans-serif"><text x="70" y="112" font-size="66" font-weight="900" letter-spacing="-4">plunk<tspan fill="#f56532">.</tspan></text><text x="70" y="260" font-size="68" font-weight="800" letter-spacing="-3">Your camera.</text><text x="70" y="337" font-size="68" font-weight="800" letter-spacing="-3">Your folders.</text><text x="70" y="414" font-size="68" font-weight="800" fill="#bd481f" letter-spacing="-3">Plunk.</text><text x="74" y="536" font-size="25">Pic → Name → Location</text></g></svg>`;
+const social = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630"><rect width="1200" height="630" fill="#0e1014"/><circle cx="1100" cy="80" r="470" fill="#25211f"/><g fill="#f4f4f5" font-family="Arial,sans-serif"><text x="70" y="112" font-size="66" font-weight="900" letter-spacing="-4">plunk<tspan fill="#f56532">.</tspan></text><text x="70" y="260" font-size="68" font-weight="800" letter-spacing="-3">Your camera.</text><text x="70" y="337" font-size="68" font-weight="800" letter-spacing="-3">Your folders.</text><text x="70" y="414" font-size="68" font-weight="800" fill="#ff8050" letter-spacing="-3">Plunk.</text><text x="74" y="536" font-size="25">Pic → Name → Location</text></g></svg>`;
 const layers = [];
 try {
   await access("public/launch/app-success.png");

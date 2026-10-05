@@ -22,7 +22,7 @@ It’s on the whiteboard. Under the desk. Scribbled on the back of something.
 
 Plunk gives those pictures somewhere to go: your project folders.
 
-Take a picture. Give it a useful name. Choose a server and browse to a folder. Plunk saves a JPEG there. No emailing yourself, no hunting for IMG_4827, no extra place to store the picture.
+Take a picture. Give it a useful name. Tap a folder tile. With one saved server, Plunk takes you straight to its folders; with several, choose a server first. Plunk saves a JPEG there. No emailing yourself, no hunting for IMG_4827, no extra place to store the picture.
 
 There’s a little setup first: run a listener on Linux, give it an HTTPS address, and save it on your phone. Each server chooses its authentication. After that, it’s Pic → Name → Location.
 

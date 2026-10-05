@@ -10,10 +10,13 @@ Plunk is a useful little verb. It gets a picture from the world into your work, 
 
 | Role | Color |
 | --- | --- |
-| Action / brand | `#F56532` |
-| Text | `#20201E` |
-| Canvas | `#FAF7F0` |
-| Cards | `#FFFFFF` |
+| Action / dark UI accent | `#FF8050` |
+| Original icon orange | `#F56532` |
+| Text | `#F4F4F5` |
+| Canvas | `#0E1014` |
+| Cards | `#181C23` |
+| Secondary text | `#A2A8B4` |
+| Borders | `#2B3039` |
 
 Dark text on orange buttons. Rounded system typography; bold, tightly spaced lowercase wordmark with an orange period. `public/brand/icon.svg` and `wordmark.svg` are original editable vector masters. `scripts/assets.mjs` produces PNG app icons and the social graphic. System-font rendering can vary; convert the wordmark text to outlines in a design tool before handing it to a print vendor.
 

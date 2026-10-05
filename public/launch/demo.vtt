@@ -1,10 +1,16 @@
 WEBVTT
 
-00:00.000 --> 00:08.000
-A selected whiteboard test image, ready to name.
+00:00.000 --> 00:02.000
+Choose a picture. This whiteboard is a generated test image.
 
-00:08.000 --> 00:16.000
-Name the picture and choose a saved server.
+00:02.000 --> 00:05.000
+Name it the-plan. Plunk adds .jpg.
 
-00:16.000 --> 00:40.000
-Pick the project folder. Plunk confirms the JPEG arrived.
+00:05.000 --> 00:08.000
+One saved server opens directly to a grid of folders.
+
+00:08.000 --> 00:10.000
+Open Projects / Whiteboards and tap Plunk here.
+
+00:10.000 --> 00:18.450
+Plunked. The Linux listener confirms the saved JPEG.

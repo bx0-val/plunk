@@ -1,34 +1,31 @@
 # Verification — October 5, 2026
 
-## Confirmed locally
+## Experience polish
 
-- TypeScript check and optimized Vite build pass.
-- The production preview was opened in the browser without JavaScript errors. App/setup routes, manifest, icons, social card, screenshots, video, and captions all return HTTP 200 with their expected content types.
-- 29 Linux tests pass under Ubuntu/WSL, using real filesystem operations. Coverage includes none/bearer/Basic authentication, invalid credentials, CORS and hostile origins, JPEG/PNG/HEIF conversion, orientation, EXIF removal, dimensions, file permissions, Unicode and invalid names, unknown/missing directories, traversal and symlink rejection, duplicate-name preservation, persistent retries, concurrent retries, recovery after publication but before receipt commit, corrupt images, declared/streamed size limits, incomplete multipart bodies, disk-full errors, and denied writes.
-- The real browser app connected to the Linux listener, discovered no-auth configuration, saved a server, browsed roots/subfolders, uploaded an image, and received a save receipt. The resulting 1200 × 900 JPEG exists in `.local/uploads/next-big-thing`.
-- A second upload used the remembered folder. A duplicate `the-plan.jpg` returned to naming with the original photo retained; selecting the suggested `the-plan-2.jpg` then uploaded successfully.
-- The local recording is 28 seconds, 390 × 844, H.264 MP4. The demo input is an original generated whiteboard test fixture, not a photograph. App screenshots and recording show real UI and real listener responses.
-- Automated axe checks found zero violations on the landing page, folder screen, success screen, and setup guide after fixes. Axe left two rotated illustration text labels for manual contrast review; they use dark green on a light background. The active step’s orange badge was also manually checked. This is not a complete assistive-technology audit.
-- Visual review covered desktop (1440px) and phone (390px) layouts. Responsive width checks also covered 320px. Landing anchors resolve and demo images decode successfully.
-- Browser error collection showed no unhandled JavaScript errors. A deliberate duplicate upload returns HTTP 409 as expected.
-- Production JavaScript dependency audit found no known vulnerabilities at verification time.
-- Docker Compose configuration parses successfully using `.env.example`.
+- `pnpm build` passes the TypeScript check, hosted-guide generation, and optimized Vite build.
+- **53 Linux tests** pass on Ubuntu/WSL. Existing listener coverage includes none/bearer/Basic auth, invalid credentials, CORS, JPEG/PNG/HEIF, orientation, EXIF removal, dimensions, permissions, filename validation, traversal/symlink boundaries, duplicate names, persistent/concurrent retries, interrupted publication and multipart bodies, size limits, disk-full errors, and denied writes. New CLI tests cover pairing state, interrupted code replacement, display-name ambiguity, destination renaming, port/address changes, color settings, control-character filtering, and plain/copyable URLs.
+- **7 Chromium tests** at phone size cover synchronous filename focus, the two-column folder grid, skipping a single server, multiple-server choice, remembered folders, first-server setup with the current picture retained, lost-response retry IDs, one-time pairing across settings remounts, explicit browser pairing, 320px layout, dark default, and reduced motion. Listener responses in this suite are stubbed; it is not a physical iOS test.
+- Separately, the real production app redeemed a code from a **bearer-authenticated Linux listener**, saved the server, selected the whiteboard fixture, named it `the-plan`, navigated Projects / Whiteboards, and received a save receipt. The actual file is `.local/experience-demo/projects/Whiteboards/the-plan.jpg`: 1200 × 900, RGB JPEG, no EXIF.
+- A second real flow reused the remembered folder. An existing name returned to the naming screen with the picture retained; choosing the suggested `the-plan-2.jpg` then saved successfully.
+- Refreshed app screenshots and the **18.45-second, 390 × 844, 20 fps H.264 recording** show real UI and Linux responses. The input is a generated whiteboard fixture, not an iPhone camera photograph. The social card includes the actual receipt screenshot.
+- Visual checks covered 390px phone and 1440px desktop layouts; automated overflow checks cover 320px. The photo preview fits the whole picture without cropping. Terminal pairing was exercised in a real TTY with the installed QR dependency; permanent tokens are not printed.
+- Automated axe checks reported zero violations on the capture, naming, error, success, pairing, landing, and setup screens. Dark gradients and rotated illustration text leave contrast items for manual review. Main palette pairs were checked separately; this is not a complete assistive-technology audit.
+- All 58 local documentation/hosted-guide references checked resolve. Guides are generated from Markdown; the native Tailscale path is primary, with Docker and API reference separated.
 
-## GitHub deployment verification
+## Continuous verification
 
-- The private repository is `bx0-val/plunk`. GitHub Actions builds the frontend, runs all 40 listener/setup tests, builds both Docker images, and exercises the actual Tailscale deployment's loopback proxy with authentication, JPEG saving, and retry checks.
-- [Initial successful container run](https://github.com/bx0-val/plunk/actions/runs/37269583880) confirms the images and container filesystem permissions on a GitHub-hosted Linux runner. This supersedes the earlier local Docker limitation below; it does not verify a live Tailscale connection or an iPhone.
-- The GitHub-rendered setup guide and `/setup.html` share `docs/setup.md` as their source. The updated guide passed the phone-sized browser accessibility check with zero violations.
+GitHub Actions builds the frontend, runs browser and Linux tests, builds both Docker images, then performs actual authenticated JPEG uploads, safe retry checks, and a 25 MiB request through the Tailscale container proxy. See [the workflow runs](https://github.com/bx0-val/plunk/actions/workflows/ci.yml) for the status of a particular commit.
 
-## Not verified / release prerequisites
+The [initial successful container run](https://github.com/bx0-val/plunk/actions/runs/37269583880) established the Docker path before this visual pass. It does not verify a live Tailscale connection or an iPhone. Local Docker Desktop is not running, so container checks run in CI.
 
-- Physical iPhone camera capture, Safari file-picker behavior, Home Screen installation, foreground/background transitions, and device HEIC samples. Desktop phone-sized Chrome does not prove these.
-- Local trusted HTTPS on an iPhone, local-network permissions, or an authenticated internet-hosted Linux endpoint. No server or domain was supplied for deployment.
-- Local Docker Desktop is not running; Docker images/runtime are now verified in GitHub Actions instead. Tailscale Serve certificate issuance on your own tailnet remains untested.
-- A trademark clearance search and a distinguishable public identity. An existing Plunk email product was found; see `launch-kit.md`. Nothing has been published or purchased.
+## Still needs a real device or deployment
+
+- iPhone camera and HEIC samples, Safari and Home Screen installation/storage, native keyboard appearance after **Name it**, and foreground/background transitions. Synchronous focus is tested in Chromium; only an iPhone can confirm its keyboard behavior.
+- The actual Tailscale tailnet, HTTPS certificate issuance, remote connectivity, and systemd installation on the target host. No user's server was changed during this pass.
+- A distinguishable public identity and name/trademark clearance; see the [launch kit](launch-kit.md). No domain was purchased and no public release was made.
 
 ## Reproduce
 
-Run `pnpm build`, then run `.venv/bin/python -m pytest server -q` on Linux after installing `server/requirements.lock`. Start the frontend and `python -m scripts.dev_listener` as described in the README. Use `.local/whiteboard.jpg` (generated by `pnpm assets`) for the same upload flow.
+Follow [development](development.md). Run `pnpm build`, `pnpm test:ui`, and `.venv/bin/python -m pytest server scripts -q`. Start the local frontend and Linux test listener for a real upload; `pnpm assets` generates the labeled fixture.
 
-The test dependency currently emits a Starlette warning that its httpx-based TestClient adapter is deprecated. Tests pass; this is a dependency maintenance item, not a verified production failure.
+The Python test dependency emits a Starlette deprecation warning about its httpx TestClient adapter. Tests pass; this is a dependency maintenance item, not a verified production failure.
