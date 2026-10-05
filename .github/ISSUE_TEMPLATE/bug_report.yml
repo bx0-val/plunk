@@ -1,0 +1,32 @@
+name: Something got in the way
+description: Report a problem capturing, connecting, or saving a picture.
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: "Tell us where the flow stopped. Remove tokens, pairing codes, server addresses, and personal photos from anything you attach."
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What happened?
+      description: What did you try, what did you expect, and what appeared instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Your setup
+      description: iOS version, Safari or Home Screen, Linux distribution, native or Docker, Tailscale or public HTTPS, and Plunk commit if known.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Error or screenshot
+      description: Include the exact error if available. Remove credentials and private information.

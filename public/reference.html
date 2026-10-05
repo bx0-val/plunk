@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0e1014"><title>Listener reference · Plunk</title><link rel="icon" href="/brand/icon.svg"><link rel="stylesheet" href="/setup.css"></head>
+<body><nav><a class="logo" href="/">plunk<span>.</span></a><a href="/app">Open the app ↗</a></nav><main><h1>Listener reference</h1>
+<p>All responses are JSON; errors use <code>detail</code>. Authentication is an <code>Authorization: Bearer …</code> or <code>Authorization: Basic …</code> header, selected by listener configuration. Basic uses UTF-8 credentials. Cookies are not used.</p>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Input</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GET /api/v1/info</code></td>
+<td>Public discovery</td>
+<td>Name, protocol version, auth mode, maximum image bytes</td>
+</tr>
+<tr>
+<td><code>POST /api/v1/pair</code></td>
+<td>Public; JSON <code>{&quot;code&quot;}</code> from <code>plunk pair</code></td>
+<td>Name and bearer token. Single use, 10-minute expiry, 5 attempts</td>
+</tr>
+<tr>
+<td><code>GET /api/v1/directories</code></td>
+<td>Auth required when configured; optional <code>root</code>, <code>path</code> query</td>
+<td>Allowed root identifiers/names, or child directory names</td>
+</tr>
+<tr>
+<td><code>POST /api/v1/uploads</code></td>
+<td>Multipart <code>image</code>, <code>name</code>, <code>root</code>, <code>path</code>, UUID <code>request_id</code></td>
+<td>Server, logical folder, filename, JPEG byte count, dimensions, request ID</td>
+</tr>
+</tbody></table></div>
+<p>Paths are root-relative with <code>/</code> separators. Root paths never come from the client. Filenames preserve spaces and Unicode, are normalized to NFC, reject path separators/control characters/dot names, and fit within 240 UTF-8 bytes including <code>.jpg</code>. Existing files return 409; they are never overwritten. Root IDs and relative paths are distinct from display labels.</p>
+<p>The request UUID is bound to destination, normalized filename, and input bytes. A successful retry returns the stored receipt, including after process restart. Publishing uses a same-directory hard link, so destination filesystems must support Linux hard links and directory fsync. Local ext4/XFS are appropriate; test network filesystems before use. Directory descriptors and <code>O_NOFOLLOW</code> prevent traversal through symlinks. Server administrators and processes with write access to the same directories are trusted; this is not a sandbox against a hostile co-owner of those directories.</p>
+<p>The listener limits decoded images to 50 million pixels and uploads to 25 MB by default. Caddy caps the whole multipart request at 27 MB. Adjust both limits together for larger uploads. The journal serializes writes; this is a personal utility, not a high-throughput media service. Pending hidden files are retained to recover interrupted publication; successful uploads remove theirs. Unsent phone images remain only in the open page, not persistent storage.</p>
+<p>JPEGs default to mode <code>0644</code>, so model tools running under another host account can read them if the parent directories allow access. Set <code>file_mode</code> to <code>0640</code> for group-only reading or <code>0600</code> for listener-owner-only reading, and arrange group/directory permissions accordingly. No executable file modes are supported.</p>
+</main></body></html>

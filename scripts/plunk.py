@@ -23,6 +23,11 @@ import tempfile
 import time
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlsplit
+try:
+    from .plunk_ui import Terminal
+except ImportError:
+    from plunk_ui import Terminal
 
 REPO = Path(__file__).resolve().parents[1]
 VENV_PY = REPO / '.venv' / 'bin' / 'python'
@@ -32,30 +37,33 @@ STATE = HOME / '.local' / 'state' / 'plunk'
 UNIT = HOME / '.config' / 'systemd' / 'user' / 'plunk.service'
 BIN = HOME / '.local' / 'bin' / 'plunk'
 PAIR_MINUTES = 10
-TTY = sys.stdout.isatty()
+UI = Terminal()
+COLOR_MODE = 'auto'
 
 # Prefer the project venv (it has qrcode); fall back to the system Python before install creates it.
-if VENV_PY.exists() and Path(sys.executable).resolve() != VENV_PY.resolve() and not os.environ.get('PLUNK_NO_REEXEC'):
+if __name__ == '__main__' and VENV_PY.exists() and Path(sys.executable).resolve() != VENV_PY.resolve() and not os.environ.get('PLUNK_NO_REEXEC'):
     os.environ['PLUNK_NO_REEXEC'] = '1'
     os.execv(str(VENV_PY), [str(VENV_PY), str(Path(__file__).resolve()), *sys.argv[1:]])
 
 
 def paint(code, text):
-    return f'\033[{code}m{text}\033[0m' if TTY else text
+    return UI.paint(code, text)
 
 
 def ok(msg):
-    print(f"  {paint('32', '✓')} {msg}")
+    UI.success(msg)
 
 
 def step(msg):
-    print(paint('1', msg))
+    UI.line()
+    UI.line('  ' + UI.paint('orange', '◆') + ' ' + UI.paint('bold', msg))
 
 
 def die(msg, hint=None):
-    print(f"{paint('31', 'plunk:')} {msg}", file=sys.stderr)
+    terminal = Terminal(COLOR_MODE, stream=sys.stderr)
+    terminal.line('  ' + terminal.paint('red', '×') + ' ' + terminal.paint('bold', msg))
     if hint:
-        print(f'       {hint}', file=sys.stderr)
+        terminal.note(hint)
     sys.exit(1)
 
 
@@ -91,6 +99,22 @@ def save(config):
 
 def url(config):
     return config['origins'][0]
+
+
+def update_endpoint(config, host, https_port=None, local_port=None):
+    """Keep the printed/pairing URL aligned with the native listener's Serve port."""
+    install = config.setdefault('install', {})
+    if https_port is not None:
+        install['https_port'] = https_port
+    elif 'https_port' not in install:
+        install['https_port'] = urlsplit(url(config)).port or 443
+    if local_port is not None:
+        install['local_port'] = local_port
+    elif 'local_port' not in install:
+        install['local_port'] = pick_local_port()
+    port = install['https_port']
+    origin = f'https://{host}' + ('' if port == 443 else f':{port}')
+    config['origins'] = [origin, *[o for o in config['origins'] if o != origin]]
 
 
 def slug(name, taken):
@@ -161,6 +185,7 @@ def pick_local_port():
 # ---------- commands ----------
 
 def cmd_install(a):
+    UI.title('Make yourself at home', 'Your server. Your folders. One setup.')
     step('Checking Tailscale')
     host, ip = tailscale_host()
     ok(host)
@@ -210,11 +235,7 @@ def cmd_install(a):
         }
         ok(f'created {CONFIG}' + (f' (token and app address kept from {a.import_config})' if imported else ''))
     config['static_dir'] = str(dist)
-    config.setdefault('install', {})
-    if a.https_port:
-        config['install']['https_port'] = a.https_port
-    if a.local_port:
-        config['install']['local_port'] = a.local_port
+    update_endpoint(config, host, a.https_port, a.local_port)
     STATE.mkdir(parents=True, exist_ok=True)
     save(config)
     local, https = config['install']['local_port'], config['install']['https_port']
@@ -286,25 +307,27 @@ def cmd_pair(a):
     if config['auth']['mode'] != 'bearer':
         die('Pairing needs token authentication.')
     code = f'{secrets.randbelow(10 ** 6):06d}'
-    STATE.mkdir(parents=True, exist_ok=True)
     path = Path(config.get('state_dir', STATE)) / 'pairing.json'
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, 'w') as f:
-        json.dump({'code_sha256': hashlib.sha256(code.encode()).hexdigest(), 'expires': time.time() + PAIR_MINUTES * 60}, f)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp = tempfile.mkstemp(dir=path.parent, prefix='.pair-')
+    try:
+        with os.fdopen(fd, 'w') as f:
+            json.dump({'code_sha256': hashlib.sha256(code.encode()).hexdigest(), 'expires': time.time() + PAIR_MINUTES * 60}, f)
+        os.chmod(temp, 0o600)
+        os.replace(temp, path)
+    finally:
+        if os.path.exists(temp):
+            os.unlink(temp)
     link = f'{url(config)}/app#pair={code}'
+    matrix = None
     try:
         import qrcode
-        qr = qrcode.QRCode(border=2)
+        qr = qrcode.QRCode(border=4)
         qr.add_data(link)
-        qr.print_ascii(invert=True)
+        matrix = qr.get_matrix()
     except ImportError:
         pass
-    pretty = f'{code[:3]} {code[3:]}'
-    print(paint('1', f'  Pairing code: {pretty}') + paint('2', f'   (works once, expires in {PAIR_MINUTES} minutes)'))
-    print(f"""
-  1. Scan the code with your iPhone camera (Tailscale connected), or open {url(config)}/app
-  2. In Safari: Share → Add to Home Screen, then open Plunk from the icon
-  3. Enter {pretty} when Plunk asks. Done.""")
+    UI.pairing(config['name'], url(config), code, PAIR_MINUTES, matrix)
 
 
 def cmd_add(a, path=None):
@@ -316,14 +339,22 @@ def cmd_add(a, path=None):
         die(f'You cannot write to {target}, so Plunk cannot either.')
     for r in config['roots']:
         if Path(r['path']) == target:
+            if a.name and a.name.strip() != r['name']:
+                r['name'] = a.name.strip()
+                save(config)
+                ok(f"renamed destination: {r['name']}")
+                return
             ok(f"already a destination: {r['name']} → {target}")
             return
     name = (a.name or target.name).strip()
     root = {'id': slug(name, {r['id'] for r in config['roots']}), 'name': name, 'path': str(target)}
     config['roots'].append(root)
     save(config)
-    ok(f"{paint('1', name)} → {target}")
-    print(paint('2', '    It shows up in the phone app under Choose a location.'))
+    UI.title('A new home for your pictures')
+    UI.success(name)
+    UI.field('Folder', target)
+    UI.field('Destination ID', root['id'], 'orange')
+    UI.note('Ready on your phone. Find it in the folder grid.')
 
 
 def cmd_here(a):
@@ -332,9 +363,12 @@ def cmd_here(a):
 
 def find_root(config, needle):
     as_path = Path(needle).expanduser()
-    for r in config['roots']:
-        if needle in (r['id'], r['name']) or (as_path.exists() and Path(r['path']) == as_path.resolve()):
-            return r
+    exact = [r for r in config['roots'] if needle == r['id']]
+    matches = exact or [r for r in config['roots'] if needle == r['name'] or (as_path.exists() and Path(r['path']) == as_path.resolve())]
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        die(f'More than one destination is called {needle}.', 'Use an ID from plunk ls: ' + ', '.join(r['id'] for r in matches))
     die(f'No destination called {needle}.', 'See them with: plunk ls')
 
 
@@ -350,10 +384,16 @@ def cmd_rm(a):
 
 def cmd_ls(a):
     config = load()
-    width = max(len(r['name']) for r in config['roots'])
+    UI.title('Places for your pictures', f"{len(config['roots'])} destinations on {config['name']}")
     for r in config['roots']:
-        missing = '' if Path(r['path']).is_dir() else paint('31', '  (folder missing)')
-        print(f"  {r['name']:<{width}}  {paint('2', r['path'])}{missing}")
+        UI.line()
+        UI.line('  ' + UI.paint('orange', '▸') + ' ' + UI.paint('bold', r['name']))
+        UI.field('ID', r['id'], 'orange')
+        UI.note(r['path'])
+        if not Path(r['path']).is_dir():
+            UI.line('  ' + UI.paint('red', 'Folder missing — restore it or remove this destination.'))
+    UI.line()
+    UI.note('In a project folder? Run plunk here to add it.')
 
 
 def cmd_status(a):
@@ -367,9 +407,13 @@ def cmd_status(a):
                 healthy = r.status == 200
         except OSError:
             pass
-    print(f"  service       {paint('32' if active == 'active' else '31', active)}{'' if healthy else paint('31', ' (not answering)')}")
-    print(f'  app           {url(config)}/app')
-    print(f"  destinations  {len(config['roots'])}  (plunk ls)")
+    UI.title('Ready when you are' if healthy and active == 'active' else 'Let’s check the connection')
+    UI.field('Listener', 'Running · answering requests' if healthy and active == 'active' else f'{active or "unknown"} · not ready', 'mint' if healthy and active == 'active' else 'red')
+    UI.field('Phone app', f'{url(config)}/app', 'orange')
+    UI.field('Destinations', f"{len(config['roots'])} · plunk ls")
+    UI.note('Connect a phone: plunk pair' if healthy else 'Read recent errors: plunk logs')
+    if not healthy or active != 'active':
+        raise SystemExit(1)
 
 
 def cmd_url(a):
@@ -381,6 +425,7 @@ def cmd_logs(a):
 
 
 def main():
+    global UI, COLOR_MODE
     ap = argparse.ArgumentParser(prog='plunk', description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest='cmd', required=True)
     p = sub.add_parser('install', help='one-time setup on this server')
@@ -400,7 +445,7 @@ def main():
     p.add_argument('--name')
     p.set_defaults(fn=cmd_here)
     p = sub.add_parser('rm', help='remove a destination')
-    p.add_argument('target', help='name or path')
+    p.add_argument('target', help='destination ID, unique name, or path')
     p.set_defaults(fn=cmd_rm)
     sub.add_parser('ls', help='list destinations').set_defaults(fn=cmd_ls)
     sub.add_parser('status', help='service status').set_defaults(fn=cmd_status)
@@ -408,8 +453,23 @@ def main():
     p = sub.add_parser('logs', help='recent service logs')
     p.add_argument('-n', '--lines', type=int, default=50)
     p.set_defaults(fn=cmd_logs)
+    ap.add_argument('--color', choices=['auto', 'always', 'never'], default='auto', help='terminal color (also respects NO_COLOR)')
+    for parser in sub.choices.values():
+        parser.add_argument('--color', choices=['auto', 'always', 'never'], default=argparse.SUPPRESS, help='terminal color')
+    if not sys.argv[1:] or sys.argv[1:] in (['--help'], ['-h']):
+        UI.help()
+        return
     a = ap.parse_args()
-    a.fn(a)
+    COLOR_MODE = a.color
+    UI = Terminal(a.color)
+    if sys.platform != 'linux':
+        die('The Plunk listener runs on Linux.', 'Use your Linux server or WSL. The phone app runs in Safari.')
+    try:
+        a.fn(a)
+    except (OSError, ValueError) as e:
+        die(str(e), 'Check the path and permissions, then try again.')
+    except KeyboardInterrupt:
+        die('Stopped. Run the command again when you’re ready.')
 
 
 if __name__ == '__main__':

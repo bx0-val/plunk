@@ -15,6 +15,8 @@ jobs:
       - uses: pnpm/action-setup@v4
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:ui
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
