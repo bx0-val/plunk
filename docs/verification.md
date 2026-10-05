@@ -14,11 +14,17 @@
 - Production JavaScript dependency audit found no known vulnerabilities at verification time.
 - Docker Compose configuration parses successfully using `.env.example`.
 
+## GitHub deployment verification
+
+- The private repository is `bx0-val/plunk`. GitHub Actions builds the frontend, runs all 40 listener/setup tests, builds both Docker images, and exercises the actual Tailscale deployment's loopback proxy with authentication, JPEG saving, and retry checks.
+- [Initial successful container run](https://github.com/bx0-val/plunk/actions/runs/37269583880) confirms the images and container filesystem permissions on a GitHub-hosted Linux runner. This supersedes the earlier local Docker limitation below; it does not verify a live Tailscale connection or an iPhone.
+- The GitHub-rendered setup guide and `/setup.html` share `docs/setup.md` as their source. The updated guide passed the phone-sized browser accessibility check with zero violations.
+
 ## Not verified / release prerequisites
 
 - Physical iPhone camera capture, Safari file-picker behavior, Home Screen installation, foreground/background transitions, and device HEIC samples. Desktop phone-sized Chrome does not prove these.
 - Local trusted HTTPS on an iPhone, local-network permissions, or an authenticated internet-hosted Linux endpoint. No server or domain was supplied for deployment.
-- Docker image build/runtime and Caddy certificate issuance: Docker Desktop’s Linux engine is not running here. The listener was executed directly in Ubuntu/WSL; the Compose topology was statically validated.
+- Local Docker Desktop is not running; Docker images/runtime are now verified in GitHub Actions instead. Tailscale Serve certificate issuance on your own tailnet remains untested.
 - A trademark clearance search and a distinguishable public identity. An existing Plunk email product was found; see `launch-kit.md`. Nothing has been published or purchased.
 
 ## Reproduce

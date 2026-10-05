@@ -39,7 +39,7 @@ Open `http://127.0.0.1:5173/app`. Add `http://127.0.0.1:8741` as a server. HTTP 
 
 ```sh
 pnpm build
-.venv/bin/python -m pytest server -q
+.venv/bin/python -m pytest server scripts -q
 ```
 
 ## Deploy
@@ -66,7 +66,7 @@ Paths are root-relative with `/` separators. Root paths never come from the clie
 
 The request UUID is bound to destination, normalized filename, and input bytes. A successful retry returns the stored receipt, including after process restart. Publishing uses a same-directory hard link, so destination filesystems must support Linux hard links and directory fsync. Local ext4/XFS are appropriate; test network filesystems before use. Directory descriptors and `O_NOFOLLOW` prevent traversal through symlinks. Server administrators and processes with write access to the same directories are trusted; this is not a sandbox against a hostile co-owner of those directories.
 
-The listener limits decoded images to 50 million pixels and uploads to 25 MB by default. Caddy caps the whole multipart request at 26 MB. Adjust both limits together for larger uploads. The journal serializes writes; this is a personal utility, not a high-throughput media service. Pending hidden files are retained to recover interrupted publication; successful uploads remove theirs. Unsent phone images remain only in the open page, not persistent storage.
+The listener limits decoded images to 50 million pixels and uploads to 25 MB by default. Caddy caps the whole multipart request at 27 MB. Adjust both limits together for larger uploads. The journal serializes writes; this is a personal utility, not a high-throughput media service. Pending hidden files are retained to recover interrupted publication; successful uploads remove theirs. Unsent phone images remain only in the open page, not persistent storage.
 
 JPEGs default to mode `0644`, so model tools running under another host account can read them if the parent directories allow access. Set `file_mode` to `0640` for group-only reading or `0600` for listener-owner-only reading, and arrange group/directory permissions accordingly. No executable file modes are supported.
 
