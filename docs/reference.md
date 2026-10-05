@@ -17,4 +17,3 @@ The request UUID is bound to destination, normalized filename, and input bytes. 
 The listener limits decoded images to 50 million pixels and uploads to 25 MB by default. Caddy caps the whole multipart request at 27 MB. Adjust both limits together for larger uploads. The journal serializes writes; this is a personal utility, not a high-throughput media service. Pending hidden files are retained to recover interrupted publication; successful uploads remove theirs. Unsent phone images remain only in the open page, not persistent storage.
 
 JPEGs default to mode `0644`, so model tools running under another host account can read them if the parent directories allow access. Set `file_mode` to `0640` for group-only reading or `0600` for listener-owner-only reading, and arrange group/directory permissions accordingly. No executable file modes are supported.
-
