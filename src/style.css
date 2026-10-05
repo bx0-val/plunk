@@ -1705,3 +1705,14 @@ progress {
   border: 1px solid var(--line);
   border-radius: 18px;
 }
+
+.pair-form {
+  margin-bottom: 34px;
+  padding-bottom: 30px;
+  border-bottom: 1px solid var(--line);
+}
+.pair-form input {
+  font-size: 26px;
+  letter-spacing: 0.25em;
+  font-variant-numeric: tabular-nums;
+}

@@ -9,13 +9,15 @@ from pathlib import Path
 import secrets
 import sqlite3
 import stat
+import threading
+import time
 import unicodedata
 import uuid
 import warnings
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from PIL import Image, ImageOps, UnidentifiedImageError
 from pillow_heif import register_heif_opener
 from server.auth import verify_password
@@ -77,16 +79,41 @@ def directory(root: str, relative: str):
     finally:
         os.close(fd)
 
-def create_app(config=None):
-    if os.name != 'posix':
-        raise RuntimeError('Run the Plunk listener on Linux (or WSL).')
-    if config is None:
-        config = json.loads(Path(os.environ.get('PLUNK_CONFIG', 'config.json')).read_text())
-    roots = {r['id']: r for r in config['roots']}
-    if not roots or len(roots) != len(config['roots']):
+def build_roots(raw):
+    roots = {r['id']: dict(r) for r in raw}
+    if not roots or len(roots) != len(raw):
         raise ValueError('Configure unique roots.')
     for root in roots.values():
         root['path'] = str(Path(root['path']).resolve(strict=True))
+    return roots
+
+SECURITY_HEADERS = {
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
+    'Permissions-Policy': 'camera=(self), microphone=(), geolocation=()',
+    'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self' https:; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+}
+PAIR_ATTEMPTS = 5
+
+def create_app(config=None, config_path=None):
+    if os.name != 'posix':
+        raise RuntimeError('Run the Plunk listener on Linux (or WSL).')
+    if config is None:
+        config_path = Path(os.environ.get('PLUNK_CONFIG', 'config.json'))
+        config = json.loads(config_path.read_text())
+    live = {'roots': build_roots(config['roots']), 'mtime': config_path.stat().st_mtime if config_path else None}
+
+    def current_roots():
+        # `plunk add` edits the config file; pick up destination changes without a restart.
+        if config_path:
+            try:
+                mtime = config_path.stat().st_mtime
+                if mtime != live['mtime']:
+                    live['roots'] = build_roots(json.loads(config_path.read_text())['roots'])
+                    live['mtime'] = mtime
+            except (OSError, ValueError, KeyError) as error:
+                print(f'kept previous destinations; config reload failed: {error}', flush=True)
+        return live['roots']
     auth = config.get('auth', {'mode': 'none'})
     mode = auth['mode']
     if mode not in ('none', 'bearer', 'basic'):
@@ -107,6 +134,9 @@ def create_app(config=None):
     state = Path(config['state_dir'])
     state.mkdir(parents=True, exist_ok=True)
     db_path = state / 'receipts.sqlite3'
+    pair_path = state / 'pairing.json'
+    pair_lock = threading.Lock()
+    static_dir = Path(config['static_dir']).resolve(strict=True) if config.get('static_dir') else None
 
     def connect():
         db = sqlite3.connect(db_path, timeout=30)
@@ -126,11 +156,16 @@ def create_app(config=None):
         origin = request.headers.get('origin')
         if origin and origin not in origins:
             return JSONResponse({'detail': 'App origin is not allowed.'}, 403)
-        if request.url.path != '/api/v1/info' and request.method != 'OPTIONS':
+        api = request.url.path.startswith('/api/')
+        if api and request.url.path not in ('/api/v1/info', '/api/v1/pair') and request.method != 'OPTIONS':
             header = request.headers.get('authorization', '')
             valid = mode == 'none'
             if mode == 'bearer':
-                valid = secrets.compare_digest(header.encode(), ('Bearer ' + auth['token']).encode())
+                scheme, _, given = header.partition(' ')
+                valid = scheme.lower() == 'bearer' and secrets.compare_digest(given.strip().encode(), auth['token'].encode())
+                if not valid:
+                    # Diagnostics only: shape of what arrived, never its value.
+                    print(f"auth rejected: scheme={scheme[:10]!r} token_len={len(given.strip())} expected_len={len(auth['token'])} padded={given != given.strip()}", flush=True)
             elif mode == 'basic':
                 try:
                     scheme, credentials = header.split(' ', 1)
@@ -146,8 +181,11 @@ def create_app(config=None):
         except ValueError:
             return JSONResponse({'detail': 'Invalid content length.'}, 400)
         response = await call_next(request)
-        response.headers['Cache-Control'] = 'no-store'
-        response.headers['X-Content-Type-Options'] = 'nosniff'
+        if api:
+            response.headers['Cache-Control'] = 'no-store'
+            response.headers['X-Content-Type-Options'] = 'nosniff'
+        else:
+            response.headers.update(SECURITY_HEADERS)
         return response
 
     app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=['GET', 'POST', 'OPTIONS'], allow_headers=['Authorization', 'Content-Type'], max_age=600)
@@ -159,6 +197,7 @@ def create_app(config=None):
         return JSONResponse({'detail': 'This folder is unavailable or not writable. Choose another folder.'}, 403)
 
     def root_path(root):
+        roots = current_roots()
         if root not in roots:
             fail(404, 'This saved root is no longer available. Choose another location.')
         return roots[root]['path']
@@ -170,7 +209,7 @@ def create_app(config=None):
     @app.get('/api/v1/directories')
     def directories(root: str | None = None, path: str = ''):
         if root is None:
-            return {'roots': [{'id': r['id'], 'name': r['name']} for r in roots.values()]}
+            return {'roots': [{'id': r['id'], 'name': r['name']} for r in current_roots().values()]}
         with directory(root_path(root), path) as fd:
             with os.scandir(fd) as entries:
                 children = sorted([e.name for e in entries if e.is_dir(follow_symlinks=False)], key=str.casefold)
@@ -224,7 +263,7 @@ def create_app(config=None):
                         os.fchmod(stream.fileno(), int(file_mode, 8))
                         os.fsync(stream.fileno())
                     os.fsync(fd)
-                    receipt = {'server': config['name'], 'root': root, 'folder': '/'.join(filter(None, [roots[root]['name'], path])), 'filename': target, 'bytes': output.tell(), 'width': clean.width, 'height': clean.height, 'request_id': request_id}
+                    receipt = {'server': config['name'], 'root': root, 'folder': '/'.join(filter(None, [current_roots()[root]['name'], path])), 'filename': target, 'bytes': output.tell(), 'width': clean.width, 'height': clean.height, 'request_id': request_id}
                     db.execute('INSERT INTO receipts VALUES (?,?,?,?,?)', (request_id, binding, 'pending', temp, json.dumps(receipt)))
                     db.commit()
                 except BaseException:
@@ -253,4 +292,44 @@ def create_app(config=None):
             with contextlib.suppress(OSError):
                 os.unlink(temp, dir_fd=fd)
             return json.loads(row['receipt'])
+
+    @app.post('/api/v1/pair')
+    async def pair(request: Request):
+        """Trade a short-lived code from `plunk pair` for the bearer token. Single use, few attempts."""
+        if mode != 'bearer':
+            fail(404, 'Pairing is only available for token authentication.')
+        try:
+            code = str((await request.json()).get('code', '')).replace(' ', '')
+        except (ValueError, AttributeError):
+            fail(422, 'Send the pairing code.')
+        with pair_lock:
+            try:
+                pending = json.loads(pair_path.read_text())
+            except (OSError, ValueError):
+                pending = None
+            if not pending or pending.get('expires', 0) < time.time():
+                with contextlib.suppress(OSError):
+                    pair_path.unlink()
+                fail(410, 'No active pairing code. Run plunk pair on the server for a new one.')
+            if secrets.compare_digest(hashlib.sha256(code.encode()).hexdigest(), pending['code_sha256']):
+                pair_path.unlink()
+                return {'name': config['name'], 'auth': 'bearer', 'token': auth['token']}
+            pending['attempts'] = pending.get('attempts', 0) + 1
+            if pending['attempts'] >= PAIR_ATTEMPTS:
+                pair_path.unlink()
+                fail(429, 'Too many wrong codes. Run plunk pair on the server for a new one.')
+            pair_path.write_text(json.dumps(pending))
+        fail(401, 'That code is not right. Check the code on the server.')
+
+    if static_dir:
+        # Native installs serve the app themselves; Docker installs use Caddy instead.
+        @app.get('/{asset:path}', include_in_schema=False)
+        def static(asset: str):
+            if asset.startswith('api/'):
+                fail(404, 'Not found.')
+            candidate = (static_dir / asset).resolve()
+            if asset and candidate.is_file() and candidate.is_relative_to(static_dir):
+                cache = 'public, max-age=31536000, immutable' if asset.startswith('assets/') else 'no-cache'
+                return FileResponse(candidate, headers={'Cache-Control': cache})
+            return FileResponse(static_dir / 'index.html', headers={'Cache-Control': 'no-cache'})
     return app

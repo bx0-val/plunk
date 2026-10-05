@@ -18,9 +18,12 @@ import {
   type Receipt,
   type Server,
   UploadError,
+  isStandalone,
   jpegName,
   loadServers,
   normalizeUrl,
+  pair,
+  readPairCode,
   request,
   saveServers,
   upload,
@@ -42,16 +45,65 @@ function ServerSettings({
   servers,
   onSave,
   onClose,
+  pairCode = "",
 }: {
   servers: Server[];
   onSave: (value: Server[]) => void;
   onClose: () => void;
+  pairCode?: string;
 }) {
   const [draft, setDraft] = useState<Server>(emptyServer);
   const [detected, setDetected] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [code, setCode] = useState(pairCode);
+  const [pairError, setPairError] = useState("");
+  const [pairNotice, setPairNotice] = useState("");
+  const autoPaired = useRef(false);
+  const standalone = isStandalone();
+  async function pairHere(event?: FormEvent) {
+    event?.preventDefault();
+    const digits = code.replace(/\D/g, "");
+    if (digits.length !== 6) {
+      setPairError("Enter the 6-digit code that plunk pair shows on the server.");
+      return;
+    }
+    setBusy(true);
+    setPairError("");
+    setPairNotice("");
+    try {
+      // The app is served by the listener it pairs with, so its own origin is the server address.
+      const base = window.location.origin;
+      const result = await pair(base, digits);
+      const existing = servers.find((s) => s.url === base);
+      const server: Server = {
+        ...(existing ?? emptyServer()),
+        name: existing?.name || result.name,
+        url: base,
+        auth: "bearer",
+        token: result.token,
+        username: "",
+        password: "",
+      };
+      await request(server, "directories");
+      onSave([...servers.filter((s) => s.id !== server.id), server]);
+      setCode("");
+      setPairNotice(`${server.name} is connected and saved. Close this to start plunking.`);
+    } catch (e) {
+      setPairError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  useEffect(() => {
+    // From the QR link inside the Home Screen app, pair without another tap.
+    if (pairCode && standalone && !autoPaired.current) {
+      autoPaired.current = true;
+      void pairHere();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const update = (patch: Partial<Server>) => {
     setDraft((s) => ({ ...s, ...patch }));
     setNotice("");
@@ -73,6 +125,9 @@ function ServerSettings({
         ...normalized,
         name: draft.name.trim() || info.name,
         auth: info.auth,
+        // Pasted secrets often carry invisible whitespace; the field is masked, so trim it.
+        token: draft.token.trim(),
+        username: draft.username.trim(),
       };
       setDraft(next);
       setDetected(true);
@@ -154,12 +209,52 @@ function ServerSettings({
           </div>
         ))}
       </div>
+      <form className="pair-form" onSubmit={pairHere}>
+        <fieldset disabled={busy}>
+          <legend>Pair with a code</legend>
+          {pairCode && !standalone && (
+            <p className="notice">
+              For the best experience, add Plunk to your Home Screen first
+              (Share → Add to Home Screen), open it from the icon, and enter
+              this code there. Or pair this browser now.
+            </p>
+          )}
+          <label>
+            Run <code>plunk pair</code> on the server and enter its code
+            <input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="123 456"
+              maxLength={7}
+              value={code}
+              onChange={(e) => {
+                setCode(e.target.value);
+                setPairError("");
+              }}
+            />
+          </label>
+          {pairError && (
+            <p className="error" role="alert">
+              {pairError}
+            </p>
+          )}
+          {pairNotice && (
+            <p className="notice" role="status">
+              {pairNotice}
+            </p>
+          )}
+          <button className="button primary wide" type="submit">
+            {busy ? "Pairing…" : `Pair with ${window.location.host}`}
+            <ArrowRight size={18} />
+          </button>
+        </fieldset>
+      </form>
       <form onSubmit={submit}>
         <fieldset disabled={busy}>
           <legend>
             {servers.some((s) => s.id === draft.id)
               ? "Edit server"
-              : "Add a server"}
+              : "Or add a server by address"}
           </legend>
           <label>
             Server name <span className="optional">optional</span>
@@ -273,7 +368,8 @@ function ServerSettings({
 
 export function PhoneApp() {
   const [servers, setServers] = useState(loadServers);
-  const [settings, setSettings] = useState(false);
+  const [pairCode] = useState(readPairCode);
+  const [settings, setSettings] = useState(() => Boolean(pairCode));
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
@@ -307,6 +403,10 @@ export function PhoneApp() {
   useEffect(() => {
     heading.current?.focus();
   }, [step, receipt]);
+  useEffect(() => {
+    // Keep the one-time code out of history and any Home Screen bookmark.
+    if (pairCode) history.replaceState(null, "", window.location.pathname);
+  }, [pairCode]);
   useEffect(() => {
     if (!file || receipt) return;
     const prevent = (e: BeforeUnloadEvent) => {
@@ -453,6 +553,7 @@ export function PhoneApp() {
         {settings ? (
           <ServerSettings
             servers={servers}
+            pairCode={pairCode}
             onSave={persist}
             onClose={() => {
               setSettings(false);
