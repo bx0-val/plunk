@@ -464,7 +464,7 @@ export function PhoneApp() {
   useEffect(() => {
     if (step === 2 && !receipt) {
       if (document.activeElement !== nameInput.current)
-        nameInput.current?.focus({ preventScroll: true });
+        nameInput.current?.focus();
     } else heading.current?.focus();
   }, [step, receipt]);
   useEffect(() => {
@@ -486,7 +486,8 @@ export function PhoneApp() {
   function openName() {
     // iOS only opens its keyboard while focus is inside the original tap gesture.
     flushSync(() => setStep(2));
-    nameInput.current?.focus({ preventScroll: true });
+    // Let Safari scroll the field into view as its keyboard opens.
+    nameInput.current?.focus();
   }
   function openLocation() {
     setStep(3);
