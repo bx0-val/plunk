@@ -1,99 +1,73 @@
-# Plunk
+<p align="center"><img src="public/brand/readme-banner.svg" alt="Plunk. Your camera. Your folders. Pic → Name → Location." width="960"></p>
 
-**Your camera. Your folders. Plunk.**
+<p align="center">
+  <a href="https://github.com/bx0-val/plunk/actions/workflows/ci.yml"><img src="https://github.com/bx0-val/plunk/actions/workflows/ci.yml/badge.svg" alt="Verify Plunk"></a>
+  <br><br>
+  <a href="docs/setup.md"><strong>Set up Plunk</strong></a> ·
+  <a href="#see-it-work">See it work</a> ·
+  <a href="docs/development.md">Build & contribute</a>
+</p>
 
-Take a picture. Give it a name. Pick where it goes. Plunk sends it directly from your iPhone web app to a folder on your Linux server.
+Take a pic. Name it. Pick a folder. **Straight from your iPhone to your Linux server.**
 
-**Pic → Name → Location.** Real-world context for your models.
+The whiteboard, the handwritten idea, the hardware on your desk. Plunk turns “here, look” into a JPEG in your project folder, ready for whatever comes next. Your model tooling decides how to use it.
 
-**Ready to try it on your iPhone? → [Follow the Tailscale setup guide](docs/setup.md).**
+## Small enough to become a habit
 
-The guide covers cloning this private repository, generating configuration, starting Docker, enabling trusted HTTPS with Tailscale Serve, installing the phone app, and verifying your first saved picture.
+- **Pic → Name → Location.** Camera or photo library, a name you choose, a grid of folders. One server saved? Go straight to its folders.
+- **Made for your Home Screen.** A dark interface, warm orange actions, remembered destinations, and a receipt when the server confirms the save.
+- **Your folders, on your terms.** Run `plunk here` in a project. It becomes a destination immediately.
+- **Direct to the listener.** No central image storage, account platform, or analytics. Each server controls its own authentication and allowed folders.
+- **Files your tools can use.** Upright RGB JPEGs at quality 95, with original dimensions and EXIF removed. Existing files are never overwritten.
 
-## What’s here
+## Start on your Linux server
 
-- React/TypeScript phone app at `/app`, with camera/library selection, saved servers, authentication discovery, directory browsing, progress, and upload receipts.
-- Responsive launch page at `/`, setup guide at `/setup.html`, original SVG identity and generated app icons under `public/brand`.
-- FastAPI Linux listener with none/bearer/Basic authentication, JPEG/PNG/HEIC decoding, orientation correction, metadata stripping, restricted roots, and persistent idempotency receipts.
-- Docker Compose with Caddy HTTPS. Images travel straight to the selected listener, without a cloud relay.
+Already using Tailscale? You need **Python 3.12+, Node 22+ with Corepack, Git, and a systemd user session**. Keep your iPhone on the same tailnet. The [step-by-step guide](docs/setup.md) covers prerequisites, private-repository access, and troubleshooting.
 
-## Local development
-
-Requirements: Node 22+, pnpm, Linux Python 3.12+ (WSL works on Windows).
-
-```sh
-pnpm install
-node scripts/assets.mjs
-pnpm dev
+```bash
+git clone https://github.com/bx0-val/plunk.git
+cd plunk
+./scripts/plunk.py install
 ```
 
-In Linux, from the repository root:
+The installer builds the app, starts the listener, configures Tailscale HTTPS on a free port, and shows a QR code and a one-time pairing code. Add Plunk to your iPhone Home Screen, open it from the icon, and connect with the code.
 
-```sh
-python3 -m venv .venv
-.venv/bin/pip install -r server/requirements.lock
-.venv/bin/python -m scripts.dev_listener
+Then make it part of your work:
+
+```bash
+cd ~/projects/robot
+plunk here --name Robot
+
+plunk pair       # Connect a phone
+plunk ls         # See your destinations and their IDs
+plunk status     # Check the listener and app address
 ```
 
-Open `http://127.0.0.1:5173/app`. Add `http://127.0.0.1:8741` as a server. HTTP is allowed only for loopback development; other destinations require HTTPS. The dev listener allows only the local frontend origin and writes to `.local/uploads`. It has no authentication and binds to loopback only.
+The terminal uses color automatically, respects `NO_COLOR`, and supports `--color always|never|auto`. `plunk url` stays plain for scripts. Prefer containers? Use the [Docker guide](docs/docker.md).
 
-```sh
-pnpm build
-.venv/bin/python -m pytest server scripts -q
-```
+## See it work
 
-## Deploy
+<p align="center">
+  <img src="public/launch/app-name.png" alt="Name a selected whiteboard image the-plan" width="30%">
+  <img src="public/launch/app-location.png" alt="Choose a project in Plunk’s folder grid" width="30%">
+  <img src="public/launch/app-success.png" alt="Receipt confirming the-plan.jpg arrived in the Linux project folder" width="30%">
+</p>
 
-### Quick install on a Tailscale server (no Docker)
+Actual app screens from a desktop browser at phone size, connected to a Linux listener in WSL. The whiteboard is a generated test image. [Watch the local upload recording](public/launch/plunk-demo.mp4). Physical iPhone Safari/Home Screen and remote Tailscale checks must still be performed on your devices.
 
-```sh
-git clone https://github.com/bx0-val/plunk.git && cd plunk
-scripts/plunk.py install
-```
+## Good to know
 
-`install` checks Tailscale, creates `.venv`, builds the app, writes `~/.config/plunk/config.json` with a fresh token, starts a `plunk` systemd user service on a loopback port, picks a free HTTPS port for `tailscale serve`, links `plunk` into `~/.local/bin`, and prints a QR code with a one-time pairing code. Scan it, add Plunk to the Home Screen, enter the code. No token copying.
+Keep Plunk open while uploading. There is no background queue in v1; reloading closes the unsent picture. Recoverable errors keep the current picture and name, and retries reuse a request ID to avoid a second save.
 
-Then choose where pictures can go. Destinations take effect immediately, with no restart:
+Saved server credentials live in the browser profile. Pairing is single use and expires after ten minutes. For additional listeners, configure the installed app’s origin and add the server by address. Bearer tokens, HTTP Basic, and no authentication are supported. [Setup and multi-server instructions →](docs/setup.md)
 
-```sh
-cd ~/projects/robot && plunk here           # this folder is now a destination
-plunk add ~/notes/whiteboards --name Notes  # or any folder you can write to
-plunk ls                                    # list; plunk rm NAME removes one (files stay)
-plunk pair                                  # connect another phone
-plunk status | plunk logs                   # health and recent logs
-```
+| Looking for… | Go here |
+| --- | --- |
+| First install, pairing, destinations, updates | [Setup guide](docs/setup.md) |
+| Containers or public-domain HTTPS | [Docker guide](docs/docker.md) |
+| API, limits, filesystem guarantees | [Listener reference](docs/reference.md) |
+| Local development and tests | [Development](docs/development.md) |
+| What has actually been checked | [Verification record](docs/verification.md) |
+| Identity and launch materials | [Brand](docs/brand.md) · [Launch kit](docs/launch-kit.md) |
 
-The listener runs as your user, so it writes wherever you can. Pairing codes are single use, expire after 10 minutes and die after 5 wrong attempts. Moving from a Docker install keeps the phone's saved server: `scripts/plunk.py install --https-port PORT --import-config config.json`. After pulling app changes, run `plunk install --rebuild`.
-
-### Docker
-
-Use the [Tailscale setup guide](docs/setup.md) for a private installation. `python3 scripts/setup.py` creates configuration and selects `compose.tailscale.yaml`; Tailscale Serve supplies trusted HTTPS and Docker exposes only a loopback HTTP port. The listener runs as UID/GID 10001. Keep the receipt volume persistent.
-
-The original `compose.yaml` remains available for a public domain with Caddy-managed HTTPS. For that alternative, copy `.env.example` and `server/config.example.json`, configure your hostname, origin and token, and grant UID/GID 10001 access to the configuration and destination folder. Do not mix the public and Tailscale configurations on the same installation.
-
-For another server, deploy another listener and allow the **same installed app origin** in its configuration. Save its address in the existing phone app. Authentication belongs to each listener; no central account is involved.
-
-The app is installable via Safari’s Add to Home Screen. V1 deliberately has no service-worker upload queue or offline guarantee. Keep the page open while uploading. Credentials are saved in localStorage; clearing site data removes them. Protect your browser profile.
-
-## API v1
-
-All responses are JSON; errors use `detail`. Authentication is an `Authorization: Bearer …` or `Authorization: Basic …` header, selected by listener configuration. Basic uses UTF-8 credentials. Cookies are not used.
-
-| Endpoint | Input | Output |
-| --- | --- | --- |
-| `GET /api/v1/info` | Public discovery | Name, protocol version, auth mode, maximum image bytes |
-| `POST /api/v1/pair` | Public; JSON `{"code"}` from `plunk pair` | Name and bearer token. Single use, 10-minute expiry, 5 attempts |
-| `GET /api/v1/directories` | Auth required when configured; optional `root`, `path` query | Allowed root identifiers/names, or child directory names |
-| `POST /api/v1/uploads` | Multipart `image`, `name`, `root`, `path`, UUID `request_id` | Server, logical folder, filename, JPEG byte count, dimensions, request ID |
-
-Paths are root-relative with `/` separators. Root paths never come from the client. Filenames preserve spaces and Unicode, are normalized to NFC, reject path separators/control characters/dot names, and fit within 240 UTF-8 bytes including `.jpg`. Existing files return 409; they are never overwritten. Root IDs and relative paths are distinct from display labels.
-
-The request UUID is bound to destination, normalized filename, and input bytes. A successful retry returns the stored receipt, including after process restart. Publishing uses a same-directory hard link, so destination filesystems must support Linux hard links and directory fsync. Local ext4/XFS are appropriate; test network filesystems before use. Directory descriptors and `O_NOFOLLOW` prevent traversal through symlinks. Server administrators and processes with write access to the same directories are trusted; this is not a sandbox against a hostile co-owner of those directories.
-
-The listener limits decoded images to 50 million pixels and uploads to 25 MB by default. Caddy caps the whole multipart request at 27 MB. Adjust both limits together for larger uploads. The journal serializes writes; this is a personal utility, not a high-throughput media service. Pending hidden files are retained to recover interrupted publication; successful uploads remove theirs. Unsent phone images remain only in the open page, not persistent storage.
-
-JPEGs default to mode `0644`, so model tools running under another host account can read them if the parent directories allow access. Set `file_mode` to `0640` for group-only reading or `0600` for listener-owner-only reading, and arrange group/directory permissions accordingly. No executable file modes are supported.
-
-## Brand and launch
-
-See [the launch kit](docs/launch-kit.md), [brand notes](docs/brand.md), and [verification record](docs/verification.md). Launch screenshots come from the working app. The whiteboard demo input is an explicitly generated test fixture, not an iPhone photograph. Publishing, domain registration, physical iPhone validation, and public release are not performed by local setup.
+Plunk is a working name; name, domain, and trademark availability have not been cleared for public release.

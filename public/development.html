@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0e1014"><title>Build and contribute · Plunk</title><link rel="icon" href="/brand/icon.svg"><link rel="stylesheet" href="/setup.css"></head>
+<body><nav><a class="logo" href="/">plunk<span>.</span></a><a href="/app">Open the app ↗</a></nav><main><h1>Build and contribute</h1>
+<p>Requirements: Node 22+, pnpm (version pinned in <code>package.json</code>), Linux Python 3.12+. WSL works on Windows; the listener uses Linux directory descriptors and hard links.</p>
+<pre tabindex="0"><code class="language-bash">pnpm install
+pnpm assets
+pnpm dev
+</code></pre>
+<p>In a Linux terminal at the repository root:</p>
+<pre tabindex="0"><code class="language-bash">python3 -m venv .venv
+.venv/bin/pip install -r server/requirements.lock
+.venv/bin/python -m scripts.dev_listener
+</code></pre>
+<p>Open <code>http://127.0.0.1:5173/app</code>. In settings, choose <strong>Use an address</strong> and connect to <code>http://127.0.0.1:8741</code>. HTTP is allowed for loopback development only. This test listener has no authentication, binds to loopback, accepts only the configured local frontend origins, and saves to <code>.local/uploads</code>.</p>
+<h2>Verify a change</h2>
+<pre tabindex="0"><code class="language-bash">pnpm build
+pnpm exec playwright install chromium
+pnpm test:ui
+.venv/bin/python -m pytest server scripts -q
+</code></pre>
+<p>The browser suite uses stubbed listener responses to exercise focus, folder navigation, first-server setup, pairing, retry IDs, small screens, and reduced motion. It does not prove camera access or the iOS keyboard. Listener tests cover actual image conversion and file operations. CI additionally builds Docker images and performs real uploads through the container proxy.</p>
+<p>Use a real Linux listener to check the complete picture → name → folder → receipt path. For UI changes, inspect the app at 320px and 390px widths and desktop size. Check foreground errors, long folder names, and touch targets. Report physical iPhone/Safari/Home Screen and remote-server checks separately from browser emulation.</p>
+<h2>Where things live</h2>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>src/phone.tsx</code>, <code>src/api.ts</code></td>
+<td>Phone workflow and listener requests</td>
+</tr>
+<tr>
+<td><code>src/style.css</code>, <code>src/experience.css</code></td>
+<td>Layout and shared dark theme</td>
+</tr>
+<tr>
+<td><code>src/landing.tsx</code></td>
+<td>Product page</td>
+</tr>
+<tr>
+<td><code>scripts/plunk.py</code>, <code>scripts/plunk_ui.py</code></td>
+<td>Native installation, destinations, pairing, terminal presentation</td>
+</tr>
+<tr>
+<td><code>server/app.py</code></td>
+<td>Listener API, conversion, guarded file writes, receipt journal</td>
+</tr>
+<tr>
+<td><code>docs/</code></td>
+<td>Source guides, reference, brand and verification notes</td>
+</tr>
+<tr>
+<td><code>scripts/build-guide.mjs</code></td>
+<td>Generates hosted HTML guides during <code>pnpm build</code></td>
+</tr>
+<tr>
+<td><code>scripts/assets.mjs</code></td>
+<td>App icons, labeled whiteboard fixture, social graphic</td>
+</tr>
+</tbody></table></div>
+<p>Launch screenshots must show the actual app. Label fixtures honestly and record the environment. Regenerate social artwork after replacing <code>public/launch/app-success.png</code>.</p>
+<p>Pull requests should describe the user-visible result, relevant validation, and any checks that could not be performed. Never attach real tokens, pairing links, configuration, or personal photos to issues, screenshots, or logs.</p>
+</main></body></html>
