@@ -100,6 +100,36 @@ export async function request<T>(
   if (!body) throw new Error("This address did not return a Plunk response.");
   return body as T;
 }
+export const isStandalone = () =>
+  window.matchMedia?.("(display-mode: standalone)").matches ||
+  (navigator as Navigator & { standalone?: boolean }).standalone === true;
+export function readPairCode() {
+  const match = window.location.hash.match(/pair=(\d{6})/);
+  return match ? match[1] : "";
+}
+// Trade a one-time code from `plunk pair` for this server's token.
+export async function pair(url: string, code: string) {
+  let response: Response;
+  try {
+    response = await fetch(`${url}/api/v1/pair`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+      credentials: "omit",
+      redirect: "error",
+      signal: AbortSignal.timeout(15000),
+      cache: "no-store",
+    });
+  } catch {
+    throw new Error("Couldn’t reach this server. Check that Tailscale is connected.");
+  }
+  const body = await response.json().catch(() => null);
+  if (!response.ok)
+    throw new Error(
+      typeof body?.detail === "string" ? body.detail : "Pairing failed. Try a new code.",
+    );
+  return body as { name: string; auth: "bearer"; token: string };
+}
 export function validateName(value: string): string | null {
   const base = value
     .trim()
