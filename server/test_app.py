@@ -168,3 +168,72 @@ def test_unwritable_directory(env, monkeypatch):
         return real_open(path, flags, *args, **kwargs)
     monkeypatch.setattr(os, 'open', denied)
     assert send(client).status_code == 403
+
+def bearer_env(env, tmp_path):
+    config, root = env
+    config['auth'] = {'mode': 'bearer', 'token': 't' * 43}
+    path = tmp_path / 'config.json'
+    path.write_text(json.dumps(config))
+    return path, root
+
+def write_code(state, code, expires_in=600):
+    import hashlib, time
+    state.mkdir(parents=True, exist_ok=True)
+    (state / 'pairing.json').write_text(json.dumps({'code_sha256': hashlib.sha256(code.encode()).hexdigest(), 'expires': time.time() + expires_in}))
+
+def test_pairing_is_single_use(env, tmp_path):
+    path, _ = bearer_env(env, tmp_path)
+    client = TestClient(create_app(config_path=None, config=json.loads(path.read_text())))
+    state = tmp_path / 'state'
+    assert client.post('/api/v1/pair', json={'code': '123456'}).status_code == 410
+    write_code(state, '123456')
+    assert client.post('/api/v1/pair', json={'code': '000000'}).status_code == 401
+    ok = client.post('/api/v1/pair', json={'code': '123 456'})
+    assert ok.status_code == 200 and ok.json()['token'] == 't' * 43
+    assert client.post('/api/v1/pair', json={'code': '123456'}).status_code == 410
+
+def test_pairing_locks_after_wrong_codes_and_expires(env, tmp_path):
+    path, _ = bearer_env(env, tmp_path)
+    client = TestClient(create_app(config=json.loads(path.read_text())))
+    state = tmp_path / 'state'
+    write_code(state, '123456')
+    codes = [client.post('/api/v1/pair', json={'code': '999999'}).status_code for _ in range(5)]
+    assert codes == [401, 401, 401, 401, 429]
+    assert client.post('/api/v1/pair', json={'code': '123456'}).status_code == 410
+    write_code(state, '123456', expires_in=-1)
+    assert client.post('/api/v1/pair', json={'code': '123456'}).status_code == 410
+
+def test_destinations_reload_from_config_file(env, tmp_path, monkeypatch):
+    path, root = bearer_env(env, tmp_path)
+    monkeypatch.setenv('PLUNK_CONFIG', str(path))
+    client = TestClient(create_app())
+    client.headers['Authorization'] = 'Bearer ' + 't' * 43
+    assert [r['id'] for r in client.get('/api/v1/directories').json()['roots']] == ['pictures']
+    week = tmp_path / 'week-03'
+    week.mkdir()
+    config = json.loads(path.read_text())
+    config['roots'].append({'id': 'week-03', 'name': 'Week 03', 'path': str(week)})
+    path.write_text(json.dumps(config))
+    os.utime(path, (1, 1))
+    assert [r['id'] for r in client.get('/api/v1/directories').json()['roots']] == ['pictures', 'week-03']
+    assert send(client, root='week-03', path='', name='notes').status_code == 200
+    assert (week / 'notes.jpg').exists()
+    path.write_text('{broken')
+    os.utime(path, (2, 2))
+    assert len(client.get('/api/v1/directories').json()['roots']) == 2
+
+def test_static_app_is_public_and_api_is_not(env, tmp_path):
+    config, _ = env
+    dist = tmp_path / 'dist'
+    (dist / 'assets').mkdir(parents=True)
+    (dist / 'index.html').write_text('<div id="root"></div>')
+    (dist / 'assets' / 'app.js').write_text('1')
+    config['auth'] = {'mode': 'bearer', 'token': 't' * 43}
+    config['static_dir'] = str(dist)
+    client = TestClient(create_app(config))
+    page = client.get('/app')
+    assert page.status_code == 200 and 'root' in page.text and 'Content-Security-Policy' in page.headers
+    assert client.get('/assets/app.js').headers['cache-control'].startswith('public')
+    assert client.get('/../config.json').text == page.text
+    assert client.get('/api/v1/directories').status_code == 401
+    assert client.get('/api/v1/nope', headers={'Authorization': 'Bearer ' + 't' * 43}).status_code == 404

@@ -44,6 +44,29 @@ pnpm build
 
 ## Deploy
 
+### Quick install on a Tailscale server (no Docker)
+
+```sh
+git clone https://github.com/bx0-val/plunk.git && cd plunk
+scripts/plunk.py install
+```
+
+`install` checks Tailscale, creates `.venv`, builds the app, writes `~/.config/plunk/config.json` with a fresh token, starts a `plunk` systemd user service on a loopback port, picks a free HTTPS port for `tailscale serve`, links `plunk` into `~/.local/bin`, and prints a QR code with a one-time pairing code. Scan it, add Plunk to the Home Screen, enter the code. No token copying.
+
+Then choose where pictures can go. Destinations take effect immediately, with no restart:
+
+```sh
+cd ~/projects/robot && plunk here           # this folder is now a destination
+plunk add ~/notes/whiteboards --name Notes  # or any folder you can write to
+plunk ls                                    # list; plunk rm NAME removes one (files stay)
+plunk pair                                  # connect another phone
+plunk status | plunk logs                   # health and recent logs
+```
+
+The listener runs as your user, so it writes wherever you can. Pairing codes are single use, expire after 10 minutes and die after 5 wrong attempts. Moving from a Docker install keeps the phone's saved server: `scripts/plunk.py install --https-port PORT --import-config config.json`. After pulling app changes, run `plunk install --rebuild`.
+
+### Docker
+
 Use the [Tailscale setup guide](docs/setup.md) for a private installation. `python3 scripts/setup.py` creates configuration and selects `compose.tailscale.yaml`; Tailscale Serve supplies trusted HTTPS and Docker exposes only a loopback HTTP port. The listener runs as UID/GID 10001. Keep the receipt volume persistent.
 
 The original `compose.yaml` remains available for a public domain with Caddy-managed HTTPS. For that alternative, copy `.env.example` and `server/config.example.json`, configure your hostname, origin and token, and grant UID/GID 10001 access to the configuration and destination folder. Do not mix the public and Tailscale configurations on the same installation.
@@ -59,6 +82,7 @@ All responses are JSON; errors use `detail`. Authentication is an `Authorization
 | Endpoint | Input | Output |
 | --- | --- | --- |
 | `GET /api/v1/info` | Public discovery | Name, protocol version, auth mode, maximum image bytes |
+| `POST /api/v1/pair` | Public; JSON `{"code"}` from `plunk pair` | Name and bearer token. Single use, 10-minute expiry, 5 attempts |
 | `GET /api/v1/directories` | Auth required when configured; optional `root`, `path` query | Allowed root identifiers/names, or child directory names |
 | `POST /api/v1/uploads` | Multipart `image`, `name`, `root`, `path`, UUID `request_id` | Server, logical folder, filename, JPEG byte count, dimensions, request ID |
 
