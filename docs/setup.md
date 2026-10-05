@@ -198,4 +198,4 @@ Do not add `-v` to `docker compose down`: the receipt volume helps safely recove
 
 For existing project folders, grant the listener's UID 10001 appropriate directory access using your server's normal group/ACL policy. Start with the dedicated test folder first. JPEGs are mode `0644` by default so other host accounts can read them when directory permissions allow.
 
-**Verification status:** Linux API tests and desktop-browser uploads passed locally. This guide adds a Tailscale deployment path; your real server/iPhone run will validate that environment. Plunk remains a working name and a private project.
+**Verification status:** All 40 listener/setup tests pass. GitHub Actions also builds both Docker images and verifies authenticated JPEG uploads through the actual container proxy. Your real server/iPhone run will validate Tailscale HTTPS, Home Screen installation, and camera capture. Plunk remains a working name and a private project.

@@ -67,8 +67,11 @@ def main():
     print('\nConfiguration saved. Run these from the Plunk repository:')
     print('sudo chgrp 10001 config.json')
     print('chmod 640 config.json')
-    print('# For a NEW picture directory only (existing folders need appropriate permissions):')
-    print(f'sudo install -d -o 10001 -g 10001 -m 755 {shlex.quote(path)}')
+    if Path(path).exists():
+        print('# This picture folder already exists. Grant UID 10001 access using your normal group/ACL policy; do not change ownership blindly.')
+    else:
+        print('# Create your new dedicated picture directory:')
+        print(f'sudo install -d -o 10001 -g 10001 -m 755 {shlex.quote(path)}')
     print('sudo docker compose up -d --build')
     print(f'sudo tailscale serve --bg --https={port} http://127.0.0.1:8787')
     print('\nPhone address: ' + config['origins'][0] + '/app')

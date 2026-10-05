@@ -55,6 +55,11 @@ try:
             assert saved.format == 'JPEG' and saved.size == (40,30)
         retry = client.post('/api/v1/uploads',data=fields,files={'image':('photo.png',data.getvalue(),'image/png')})
         assert retry.json() == response.json()
+        # A 25 MiB image plus multipart overhead must fit through the proxy too.
+        padded_image = data.getvalue() + b'\0' * (25 * 1024 * 1024 - len(data.getvalue()))
+        fields.update(name='limit-check', request_id=str(uuid.uuid4()))
+        boundary = client.post('/api/v1/uploads',data=fields,files={'image':('photo.png',padded_image,'image/png')})
+        assert boundary.status_code == 200, boundary.text
     print('Container smoke passed: frontend, guide, authentication, JPEG upload, and retry.')
 finally:
     subprocess.run(compose + ['logs','--tail','40'],env=env)
