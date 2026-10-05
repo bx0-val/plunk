@@ -1,0 +1,12 @@
+{
+  "name": "My server",
+  "origins": ["https://plunk.example.com"],
+  "auth": {
+    "mode": "bearer",
+    "token": "REPLACE_WITH_A_RANDOM_SECRET_AT_LEAST_32_CHARACTERS"
+  },
+  "roots": [{ "id": "projects", "name": "Projects", "path": "/uploads" }],
+  "state_dir": "/state",
+  "max_upload_mb": 25,
+  "file_mode": "0644"
+}

@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Set up Plunk with Tailscale</title><link rel="icon" href="/brand/icon.svg"><link rel="stylesheet" href="/setup.css"></head>
+<body><nav><a class="logo" href="/">plunk<span>.</span></a><a href="/app">Open the app ↗</a></nav><main><h1>Set up Plunk on your server with Tailscale</h1>
+<p><strong>The result:</strong> an HTTPS address such as <code>https://my-server.tail1234.ts.net/app</code>, accessible from your iPhone whenever Tailscale is connected. Pictures go into <code>/srv/plunk/pictures</code> on the server.</p>
+<p>Use <strong>Tailscale Serve</strong>, which keeps the app private to your tailnet. No router port forwarding, purchased domain, or manually installed iPhone certificate is needed. <a href="https://tailscale.com/docs/features/tailscale-serve">Tailscale Serve documentation</a></p>
+<h2>1. Check your server and phone</h2>
+<p>On the <strong>Linux server</strong>, open a terminal or SSH session. These instructions assume a normal Linux host with Docker Engine (not rootless Docker), Docker Compose v2, Git, and Python 3. On Ubuntu/Debian, install the small tools with:</p>
+<pre tabindex="0"><code class="language-bash">sudo apt-get update
+sudo apt-get install -y git python3 curl gh
+</code></pre>
+<p>Check Docker and Tailscale:</p>
+<pre tabindex="0"><code class="language-bash">sudo docker version
+sudo docker compose version
+tailscale status
+</code></pre>
+<p>Docker should show both Client and Server. If Docker is missing, install Docker Engine and its Compose plugin using the official instructions for <a href="https://docs.docker.com/engine/install/ubuntu/">Ubuntu</a> or <a href="https://docs.docker.com/engine/install/debian/">Debian</a>, then return here. Other distributions can use the <a href="https://docs.docker.com/engine/install/">Docker installation index</a>.</p>
+<p>On the <strong>iPhone</strong>, connect Tailscale to the same tailnet. Your tailnet access rules must allow the phone to reach this server.</p>
+<p>Check whether this server already uses Serve:</p>
+<pre tabindex="0"><code class="language-bash">sudo tailscale serve status
+</code></pre>
+<p>If another app already uses HTTPS port <strong>443</strong>, use <strong>8443</strong> for Plunk when asked in step 3. Do not reset an existing Serve configuration. The resulting Plunk URL will include <code>:8443</code>.</p>
+<h2>2. Get Plunk from GitHub</h2>
+<p>The repository is private. Sign in as <code>bx0-val</code> (or another GitHub account granted access) on the server. This opens a device-code login you can complete from another computer; your GitHub password is not used as a Git password.</p>
+<pre tabindex="0"><code class="language-bash">gh auth login --hostname github.com --git-protocol https --web
+gh auth setup-git
+git clone https://github.com/bx0-val/plunk.git
+cd plunk
+</code></pre>
+<p>If the server is already authenticated with repository access, just run the clone and <code>cd</code> commands. Keep this repository directory: you will use it for updates and server logs.</p>
+<h2>3. Configure it once</h2>
+<pre tabindex="0"><code class="language-bash">python3 scripts/setup.py
+</code></pre>
+<p>The helper asks for:</p>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>Prompt</th>
+<th>What to enter</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Tailscale DNS name</td>
+<td>Press Enter if the detected name is correct; otherwise enter the full <code>my-server.tail1234.ts.net</code> name. No <code>https://</code> or path.</td>
+</tr>
+<tr>
+<td>HTTPS port</td>
+<td>Press Enter for <code>443</code>; use <code>8443</code> if Serve already hosts another app on 443.</td>
+</tr>
+<tr>
+<td>Server name</td>
+<td>A friendly name, such as <code>Home lab</code>.</td>
+</tr>
+<tr>
+<td>New picture folder</td>
+<td>Press Enter for <code>/srv/plunk/pictures</code>. Start with this new folder for the first test.</td>
+</tr>
+</tbody></table></div>
+<p>It creates <code>.env</code> and <code>config.json</code>, generates a secret token, and prints the exact remaining commands for your choices. Existing configuration is never overwritten. You do not need Node or Python packages on the host; Docker builds the application.</p>
+<h2>4. Start Plunk</h2>
+<p>Run the commands the helper prints. With the default picture folder, the Docker portion is:</p>
+<pre tabindex="0"><code class="language-bash">sudo chgrp 10001 config.json
+chmod 640 config.json
+sudo install -d -o 10001 -g 10001 -m 755 /srv/plunk/pictures
+sudo docker compose up -d --build
+</code></pre>
+<p>The first build downloads dependencies and can take several minutes. The configuration gives the container access to the new picture folder; it does not expose the server&#39;s entire filesystem. If you selected a different folder, use the helper&#39;s printed directory command instead.</p>
+<p>Check it:</p>
+<pre tabindex="0"><code class="language-bash">sudo docker compose ps
+curl --fail http://127.0.0.1:8787/api/v1/info
+</code></pre>
+<p>Both containers should be running. The <code>curl</code> command should return JSON containing your server name and <code>&quot;auth&quot;:&quot;bearer&quot;</code>. Plunk&#39;s HTTP port is bound to <strong>127.0.0.1 only</strong>. The listener has no host port exposed.</p>
+<h2>5. Give it Tailscale HTTPS</h2>
+<p>For the default port:</p>
+<pre tabindex="0"><code class="language-bash">sudo tailscale serve --bg --https=443 http://127.0.0.1:8787
+sudo tailscale serve status
+</code></pre>
+<p>If you chose 8443, use this command instead of the first one:</p>
+<pre tabindex="0"><code class="language-bash">sudo tailscale serve --bg --https=8443 http://127.0.0.1:8787
+</code></pre>
+<p>If Tailscale prints a link asking you to enable Serve/HTTPS certificates, open it, enable the feature for your tailnet, then rerun the command. Serve manages the HTTPS certificate. The <code>--bg</code> setting persists across reboots. <a href="https://tailscale.com/docs/reference/tailscale-cli/serve">Serve command reference</a></p>
+<p>Copy the <strong>exact HTTPS URL</strong> printed by Serve, including <code>:8443</code> if present. Use the full <code>.ts.net</code> hostname, not a short hostname or a <code>100.x.x.x</code> address.</p>
+<h2>6. Install it on your iPhone</h2>
+<ol>
+<li>Confirm the <strong>Tailscale app is connected</strong>.</li>
+<li>Open <strong>Safari</strong> and visit the HTTPS URL followed by <code>/app</code>.</li>
+<li>Use Safari&#39;s <strong>Share → Add to Home Screen</strong>. Name it <strong>Plunk</strong> and add it.</li>
+<li>Open <strong>Plunk from its new Home Screen icon</strong>. Configure servers here so credentials are saved in the installed app&#39;s storage.</li>
+<li>Tap the <strong>gear</strong> in the top-right corner.</li>
+<li>Enter a friendly server name and the <strong>base HTTPS URL</strong>, without <code>/app</code>.</li>
+<li>Tap <strong>Connect to server</strong>. A secret-token field appears.</li>
+</ol>
+<p>Back in the server terminal, display your token:</p>
+<pre tabindex="0"><code class="language-bash">python3 scripts/setup.py --show-token
+</code></pre>
+<p>Copy that value into the phone&#39;s <strong>Secret token</strong> field and tap <strong>Test &amp; save server</strong>. You should see a connected-and-saved message. Close settings.</p>
+<h2>7. Your first Plunk</h2>
+<ol>
+<li>Tap <strong>Take a pic</strong>. Allow camera access if asked and take a picture.</li>
+<li>Preview it, tap <strong>Name it</strong>, and enter <strong>first-plunk</strong>.</li>
+<li>Tap <strong>Choose a location</strong>, choose your saved server, then <strong>Pictures</strong>.</li>
+<li>Tap <strong>Plunk here</strong>. Keep the app open until it says <strong>Plunked.</strong></li>
+</ol>
+<p>On the server:</p>
+<pre tabindex="0"><code class="language-bash">ls -lh /srv/plunk/pictures/first-plunk.jpg
+</code></pre>
+<p>That is the actual JPEG. A model tool with access to that directory can now read it. Plunk does not automatically attach it to a model conversation.</p>
+<p>To test folder browsing, make a folder and take another picture:</p>
+<pre tabindex="0"><code class="language-bash">sudo install -d -o 10001 -g 10001 -m 755 /srv/plunk/pictures/project-context
+</code></pre>
+<p>Choose <strong>Pictures → project-context</strong> on the phone. Plunk remembers the last folder for that server. Filenames never overwrite existing pictures; an existing name sends you back to naming.</p>
+<h2>Add a second server</h2>
+<p>Repeat steps 1–5 on the second Linux server. Before starting its listener, edit its <code>config.json</code> so <code>origins</code> includes the HTTPS address of the <strong>first app installed on your phone</strong>, as well as its own address:</p>
+<pre tabindex="0"><code class="language-json">&quot;origins&quot;: [
+  &quot;https://first-server.tail1234.ts.net&quot;,
+  &quot;https://second-server.tail1234.ts.net&quot;
+]
+</code></pre>
+<p>Include the port for any URL using 8443. Restart with <code>sudo docker compose restart listener</code> after editing. In the existing phone app, add the second server&#39;s HTTPS address and its own token. You keep one app, pick either server, and browse that server&#39;s allowed folders.</p>
+<h2>Updates and useful commands</h2>
+<p>Run these from the cloned <code>plunk</code> directory:</p>
+<pre tabindex="0"><code class="language-bash"># Update code and rebuild. Your configuration, pictures, and receipt volume remain.
+git pull --ff-only
+sudo docker compose up -d --build
+
+# View recent logs.
+sudo docker compose logs --tail=100 listener web
+
+# Stop Plunk, retaining data.
+sudo docker compose down
+
+# Start again.
+sudo docker compose up -d
+</code></pre>
+<p>Do not add <code>-v</code> to <code>docker compose down</code>: the receipt volume helps safely recover uploads after lost responses. Back up your picture directory, <code>config.json</code>, <code>.env</code>, and persistent Docker volumes. The generated configuration and local pictures are ignored by Git.</p>
+<h2>If something doesn&#39;t work</h2>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>What you see</th>
+<th>What to check</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GitHub says “repository not found”</td>
+<td>Run <code>gh auth status</code>. The account must have access to the private <code>bx0-val/plunk</code> repository.</td>
+</tr>
+<tr>
+<td><code>docker compose</code> is unavailable</td>
+<td>Install the Compose v2 plugin from Docker&#39;s instructions above.</td>
+</tr>
+<tr>
+<td>Build or startup fails</td>
+<td>Run <code>sudo docker compose logs --tail=100 listener web</code>. Check available disk/memory and the first build error.</td>
+</tr>
+<tr>
+<td>Listener cannot read <code>config.json</code></td>
+<td>Run <code>sudo chgrp 10001 config.json</code> and <code>chmod 640 config.json</code> again.</td>
+</tr>
+<tr>
+<td>The loopback <code>curl</code> fails</td>
+<td>Containers must be running; check <code>sudo docker compose ps</code> and logs.</td>
+</tr>
+<tr>
+<td>Safari cannot open the address</td>
+<td>Connect Tailscale on both devices; check Serve status, tailnet access rules, and the full HTTPS <code>.ts.net</code> URL/port.</td>
+</tr>
+<tr>
+<td>Safari shows a certificate warning</td>
+<td>Use the full hostname printed by Serve. Confirm HTTPS is enabled; do not work around this with plain HTTP.</td>
+</tr>
+<tr>
+<td>The app cannot connect but Safari opens the site</td>
+<td>The URL in <code>config.json</code> → <code>origins</code> must exactly match the app&#39;s origin, including port. Restart the listener after editing it.</td>
+</tr>
+<tr>
+<td>Credentials fail</td>
+<td>Show the token again and copy it without spaces. Each server has its own token.</td>
+</tr>
+<tr>
+<td>The folder is not writable</td>
+<td>For the new dedicated folder, UID 10001 needs write access. Do not recursively change ownership of an existing project.</td>
+</tr>
+<tr>
+<td>Camera preview fails</td>
+<td>Try <strong>Choose from photos</strong>. Capture the error and iOS version; physical-device testing is the next validation step.</td>
+</tr>
+<tr>
+<td>Camera upload vanishes when switching apps</td>
+<td>Keep Plunk in the foreground. V1 has no background queue; reloading discards unsent pictures.</td>
+</tr>
+</tbody></table></div>
+<p>For existing project folders, grant the listener&#39;s UID 10001 appropriate directory access using your server&#39;s normal group/ACL policy. Start with the dedicated test folder first. JPEGs are mode <code>0644</code> by default so other host accounts can read them when directory permissions allow.</p>
+<p><strong>Verification status:</strong> Linux API tests and desktop-browser uploads passed locally. This guide adds a Tailscale deployment path; your real server/iPhone run will validate that environment. Plunk remains a working name and a private project.</p>
+</main></body></html>

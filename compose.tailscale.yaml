@@ -1,0 +1,31 @@
+name: plunk
+services:
+  listener:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - ${PLUNK_UPLOADS:-/srv/plunk/pictures}:/uploads
+      - listener-state:/state
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+  web:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8787:8080"
+    volumes:
+      - ./deploy/Caddyfile.tailscale:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+volumes:
+  listener-state:
+  caddy-data:
+  caddy-config:
