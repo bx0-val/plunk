@@ -4,6 +4,8 @@
 
 Use **Tailscale Serve**, which keeps the app private to your tailnet. No router port forwarding, purchased domain, or manually installed iPhone certificate is needed. [Tailscale Serve documentation](https://tailscale.com/docs/features/tailscale-serve)
 
+> **Shortcut:** on a server with Tailscale, Python 3.12+ and Node 22+, `scripts/plunk.py install` does steps 3 to 6 without Docker and pairs your phone with a one-time code. See the README's quick install. The Docker steps below remain fully supported.
+
 ## 1. Check your server and phone
 
 On the **Linux server**, open a terminal or SSH session. These instructions assume a normal Linux host with Docker Engine (not rootless Docker), Docker Compose v2, Git, and Python 3. On Ubuntu/Debian, install the small tools with:
